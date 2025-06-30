@@ -1,0 +1,131 @@
+[project]
+name = "marketing-studio"
+version = "0.1.0"
+description = "AI-powered marketing content generation studio"
+authors = [
+    {name = "Your Name", email = "your.email@example.com"}
+]
+dependencies = [
+    "annotated-types>=0.7.0",
+    "anyio>=4.9.0",
+    "certifi>=2025.6.15",
+    "charset-normalizer>=3.4.2",
+    "click>=8.2.1",
+    "davia>=0.1.14",
+    "distro>=1.9.0",
+    "dnspython>=2.7.0",
+    "email-validator>=2.2.0",
+    "fastapi>=0.115.14",
+    "fastapi-cli>=0.0.7",
+    "h11>=0.16.0",
+    "httpcore>=1.0.9",
+    "httptools>=0.6.4",
+    "httpx>=0.28.1",
+    "idna>=3.10",
+    "jinja2>=3.1.6",
+    "jiter>=0.10.0",
+    "jsonpatch>=1.33",
+    "jsonpointer>=3.0.0",
+    "langchain-core>=0.3.66",
+    "langchain-openai>=0.3.27",
+    "langgraph>=0.5.0",
+    "langgraph-checkpoint>=2.1.0",
+    "langgraph-prebuilt>=0.5.1",
+    "langgraph-sdk>=0.1.72",
+    "langsmith>=0.4.4",
+    "markdown-it-py>=3.0.0",
+    "markupsafe>=3.0.2",
+    "mdurl>=0.1.2",
+    "openai>=1.92.3",
+    "orjson>=3.10.18",
+    "ormsgpack>=1.10.0",
+    "packaging>=24.2",
+    "pydantic>=2.11.7",
+    "pydantic-core>=2.33.2",
+    "pygments>=2.19.2",
+    "python-dotenv>=1.1.1",
+    "python-multipart>=0.0.20",
+    "pyyaml>=6.0.2",
+    "regex>=2024.11.6",
+    "requests>=2.32.4",
+    "requests-toolbelt>=1.0.0",
+    "rich>=14.0.0",
+    "rich-toolkit>=0.14.7",
+    "shellingham>=1.5.4",
+    "sniffio>=1.3.1",
+    "starlette>=0.46.2",
+    "tenacity>=9.1.2",
+    "tiktoken>=0.9.0",
+    "tqdm>=4.67.1",
+    "typer>=0.16.0",
+    "typing-inspection>=0.4.1",
+    "typing-extensions>=4.14.0",
+    "urllib3>=2.5.0",
+    "uvicorn>=0.34.3",
+    "uvloop>=0.21.0",
+    "watchfiles>=1.1.0",
+    "websockets>=15.0.1",
+    "xxhash>=3.5.0",
+    "zstandard>=0.23.0",
+    "ruff>=0.12.1",
+    "supabase>=2.16.0",
+    "langgraph-cli[inmem]>=0.3.3",
+    "google-auth-oauthlib>=1.2.2",
+    "google-api-python-client>=2.174.0",
+    "google-auth>=2.40.3",
+]
+requires-python = ">=3.11"
+license = {text = "MIT"}
+
+[project.optional-dependencies]
+dev = [
+    "ruff>=0.3.0",
+    "pytest>=8.4.1",
+    "pytest-mock>=3.14.1",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["."]
+
+[tool.ruff]
+target-version = "py311"
+line-length = 88
+
+[tool.ruff.lint]
+select = [
+    "E",  # pycodestyle errors
+    "W",  # pycodestyle warnings
+    "F",  # pyflakes
+    "I",  # isort
+    "B",  # flake8-bugbear
+    "C4", # flake8-comprehensions
+    "UP", # pyupgrade
+]
+ignore = [
+    "E501",  # line too long, handled by black
+    "B008",  # do not perform function calls in argument defaults
+    "C901",  # too complex
+]
+
+[tool.ruff.lint.per-file-ignores]
+"__init__.py" = ["F401"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+skip-magic-trailing-comma = false
+line-ending = "auto"
+
+[tool.ruff.lint.isort]
+known-first-party = ["marketing_studio"]
+
+[tool.uv]
+dev-dependencies = [
+    "ruff>=0.3.0",
+    "pytest>=8.4.1", 
+    "pytest-mock>=3.14.1",
+] 
