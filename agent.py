@@ -178,12 +178,13 @@ def write_youtube_description(
             target_audience=target_audience,
             content_type=content_type,
             goal=goal,
-            past_descriptions=state["youtube_descriptions"],
+            past_descriptions=state["youtube_descriptions"]
+            + state["new_youtube_descriptions"],
         )
     )
     return Command(
         update={
-            "youtube_descriptions": [description],
+            "new_youtube_descriptions": [description],
             "messages": [
                 ToolMessage(
                     f"YouTube description written: {description.title}",  # type: ignore
@@ -237,9 +238,9 @@ def save_state(state: State):
     if state.get("new_twitter_posts"):
         data = [p.model_dump() for p in state["new_twitter_posts"]]
         supabase.table("twitter_posts").insert(data).execute()
-    # supabase.table("youtube_descriptions").insert(
-    #     state["youtube_descriptions"]
-    # ).execute()
+    if state.get("new_youtube_descriptions"):
+        data = [p.model_dump() for p in state["new_youtube_descriptions"]]
+        supabase.table("youtube_descriptions").insert(data).execute()
 
 
 def custom_tools_condition(
