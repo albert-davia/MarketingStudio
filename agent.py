@@ -85,8 +85,7 @@ class TwitterPost(BaseModel):
 class YouTubeDescription(BaseModel):
     title: str
     description: str
-    tags: list[str]
-    video_id: str
+    video_url_drive: str
 
 
 class State(MessagesState):
@@ -95,6 +94,7 @@ class State(MessagesState):
     twitter_posts: Annotated[list[TwitterPost], operator.add]
     new_twitter_posts: Annotated[list[TwitterPost], operator.add]
     youtube_descriptions: Annotated[list[YouTubeDescription], operator.add]
+    new_youtube_descriptions: Annotated[list[YouTubeDescription], operator.add]
 
 
 def write_linkedin_post(
