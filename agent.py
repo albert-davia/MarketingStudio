@@ -80,7 +80,6 @@ class LinkedinPost(BaseModel):
 
 class TwitterPost(BaseModel):
     post: str
-    post_id: str
 
 
 class YouTubeDescription(BaseModel):
@@ -94,6 +93,7 @@ class State(MessagesState):
     linkedin_posts: Annotated[list[LinkedinPost], operator.add]
     new_linkedin_posts: Annotated[list[LinkedinPost], operator.add]
     twitter_posts: Annotated[list[TwitterPost], operator.add]
+    new_twitter_posts: Annotated[list[TwitterPost], operator.add]
     youtube_descriptions: Annotated[list[YouTubeDescription], operator.add]
 
 
@@ -147,15 +147,15 @@ def write_twitter_post(
             platform=platform,
             content_type=content_type,
             goal=goal,
-            past_posts=state["twitter_posts"],
+            past_posts=state["twitter_posts"] + state["new_twitter_posts"],
         )
     )
     return Command(
         update={
-            "twitter_posts": [post],
+            "new_twitter_posts": [post],
             "messages": [
                 ToolMessage(
-                    f"Twitter post written: {post.post_id}",  # type: ignore
+                    f"Twitter post written: {post.post}",  # type: ignore
                     tool_call_id=tool_call_id,
                 )
             ],
@@ -234,7 +234,9 @@ def save_state(state: State):
     if state.get("new_linkedin_posts"):
         data = [p.model_dump() for p in state["new_linkedin_posts"]]
         supabase.table("linkedin_posts").insert(data).execute()
-    # supabase.table("twitter_posts").insert(state["twitter_posts"]).execute()
+    if state.get("new_twitter_posts"):
+        data = [p.model_dump() for p in state["new_twitter_posts"]]
+        supabase.table("twitter_posts").insert(data).execute()
     # supabase.table("youtube_descriptions").insert(
     #     state["youtube_descriptions"]
     # ).execute()

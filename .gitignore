@@ -196,4 +196,4 @@ cython_debug/
 
 # Ignore all files and directories starting with a dot, except .gitignore
 .*
-!.gitignore
+!.gitignoretoken.pickle
