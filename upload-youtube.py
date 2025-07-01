@@ -1,17 +1,14 @@
 import datetime
-import io
 import os
 import pickle
-import re
 
 from google.auth.transport.requests import Request
 from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
-from googleapiclient.http import MediaFileUpload, MediaIoBaseDownload
+from googleapiclient.http import MediaFileUpload
 
 # Scopes
 SCOPES = [
-    "https://www.googleapis.com/auth/drive.readonly",
     "https://www.googleapis.com/auth/youtube.upload",
 ]
 
@@ -56,91 +53,62 @@ def get_authenticated_creds():
     return creds
 
 
-def extract_drive_file_id(drive_url: str) -> str:
-    """Extract the file ID from a Google Drive URL."""
-    # Pattern for Google Drive file URLs
-    patterns = [
-        r"/file/d/([a-zA-Z0-9_-]+)",  # Standard file URL
-        r"id=([a-zA-Z0-9_-]+)",  # URL with id parameter
-        r"([a-zA-Z0-9_-]{25,})",  # Fallback: any 25+ char alphanumeric string
-    ]
-
-    for pattern in patterns:
-        match = re.search(pattern, drive_url)
-        if match:
-            return match.group(1)
-
-    raise ValueError(f"Could not extract file ID from URL: {drive_url}")
-
-
-def upload_video_from_drive(
-    drive_file_id: str,
+def upload_local_video(
+    video_path: str,
     title: str,
     description: str,
     publish_at: datetime.datetime | None = None,
     tags: list[str] | None = None,
     category_id: str = "22",
     privacy_status: str = "private",
-    temp_filename: str = "temp_video.mp4",
 ) -> str:
     """
-    Downloads a video from Google Drive and uploads it to YouTube.
+    Uploads a local video file to YouTube.
     Returns the YouTube video ID.
 
     Args:
-        drive_file_id: Either a Google Drive file ID or a full Google Drive URL
+        video_path: Path to the local video file
         title: The YouTube video title
         description: The YouTube video description
         publish_at: A datetime object for the scheduled release (optional)
         tags: List of tags for the video (optional)
         category_id: YouTube category ID (default: "22" for People & Blogs)
         privacy_status: Privacy status ("private", "unlisted", "public")
-        temp_filename: Temporary filename for the downloaded video
     """
-    # Extract file ID if a full URL was provided
-    if drive_file_id.startswith("http"):
-        drive_file_id = extract_drive_file_id(drive_file_id)
+    # Check if video file exists
+    if not os.path.exists(video_path):
+        raise FileNotFoundError(f"Video file not found: {video_path}")
 
     # Authenticate
     creds = get_authenticated_creds()
 
-    # Build Drive and YouTube clients
-    drive_service = build("drive", "v3", credentials=creds)
+    # Build YouTube client
     youtube = build("youtube", "v3", credentials=creds)
-
-    # Download video from Drive
-    request = drive_service.files().get_media(fileId=drive_file_id)
-    fh = io.FileIO(temp_filename, "wb")
-    downloader = MediaIoBaseDownload(fh, request)
-    done = False
-    while not done:
-        status, done = downloader.next_chunk()
-        if status:
-            print(f"Download {int(status.progress() * 100)}%.")
-
-    # Prepare publish time
-    if publish_at is None:
-        publish_at = datetime.datetime.now(datetime.UTC) + datetime.timedelta(
-            minutes=10
-        )
-    publish_at_str = publish_at.isoformat("T") + "Z"
 
     # Prepare video metadata
     video_metadata = {
         "snippet": {
             "title": title,
             "description": description,
-            "tags": tags or ["api", "drive", "youtube"],
+            "tags": tags or ["api", "youtube"],
             "categoryId": category_id,
         },
         "status": {
             "privacyStatus": privacy_status,
-            "publishAt": publish_at_str,
             "selfDeclaredMadeForKids": False,
         },
     }
 
-    media = MediaFileUpload(temp_filename, chunksize=-1, resumable=True)
+    # Only set publishAt if scheduling is requested (i.e., publish_at is not None)
+    if publish_at is not None:
+        # Remove microseconds and ensure RFC3339 format
+        publish_at_str = publish_at.replace(microsecond=0).isoformat("T")
+        if publish_at_str.endswith("+00:00"):
+            publish_at_str = publish_at_str[:-6] + "Z"
+        print(f"Setting publish time to: {publish_at_str}")
+        video_metadata["status"]["publishAt"] = publish_at_str
+
+    media = MediaFileUpload(video_path, chunksize=-1, resumable=True)
     upload_request = youtube.videos().insert(
         part="snippet,status", body=video_metadata, media_body=media
     )
@@ -151,7 +119,10 @@ def upload_video_from_drive(
         if status:
             print(f"Uploaded {int(status.progress() * 100)}%")
 
-    print("Video uploaded and scheduled for:", publish_at_str)
+    if publish_at is not None:
+        print("Video uploaded and scheduled for:", publish_at_str)
+    else:
+        print("Video uploaded as private (not scheduled)")
     return response["id"]
 
 
@@ -161,13 +132,29 @@ if __name__ == "__main__":
         print("A browser window will open for Google authentication.")
         print("Please complete the authentication and don't close this terminal.")
 
-        video_id = upload_video_from_drive(
-            drive_file_id="https://drive.google.com/file/d/1J2kNo7YpUvUMJiWyS4_FDaETlGjWtRy3/view?usp=drive_link",
-            title="test",
-            description="test",
-            publish_at=datetime.datetime.now(datetime.UTC)
-            + datetime.timedelta(minutes=100),
-        )
+        # Example usage - replace with your actual video path
+        video_path = "/Users/davia/Desktop/experimental.mov"  # Change this to your video file path
+
+        # Set this to True if you want to schedule, False for immediate private upload
+        schedule_video = False
+
+        if schedule_video:
+            video_id = upload_local_video(
+                video_path=video_path,
+                title="Test Upload - Local Video",
+                description="This is a test upload from a local video file.",
+                publish_at=datetime.datetime.now(datetime.UTC)
+                + datetime.timedelta(minutes=30),
+                privacy_status="private",  # Set to private for testing
+            )
+        else:
+            video_id = upload_local_video(
+                video_path=video_path,
+                title="Test Upload - Local Video",
+                description="This is a test upload from a local video file.",
+                publish_at=None,
+                privacy_status="private",  # Set to private for testing
+            )
         print("YouTube Video ID:", video_id)
 
     except KeyboardInterrupt:

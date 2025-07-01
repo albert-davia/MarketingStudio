@@ -223,11 +223,11 @@ def agent(state: State):
 def load_state(state: State):
     return {
         "linkedin_posts": supabase.table("linkedin_posts").select("*").execute().data,
-        # "twitter_posts": supabase.table("twitter_posts").select("*").execute().data,
-        # "youtube_descriptions": supabase.table("youtube_descriptions")
-        # .select("*")
-        # .execute()
-        # .data,
+        "twitter_posts": supabase.table("twitter_posts").select("*").execute().data,
+        "youtube_descriptions": supabase.table("youtube_descriptions")
+        .select("*")
+        .execute()
+        .data,
     }
 
 
