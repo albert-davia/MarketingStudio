@@ -1,3 +1,4 @@
+import datetime
 import operator
 
 ## Davia setup
@@ -13,6 +14,10 @@ from langgraph.prebuilt import InjectedState, ToolNode
 from langgraph.types import Command
 from pydantic import BaseModel
 from supabase import Client, create_client
+
+# Import LinkedIn and YouTube functionality
+from linkedin_selenium_poster import LinkedInSeleniumPoster
+from upload_youtube import upload_local_video
 
 supabase: Client = create_client(os.environ["SUPABASE_URL"], os.environ["SUPABASE_KEY"])
 
@@ -76,16 +81,19 @@ content_types = ["viral thread", "sales page", "cold email", "newsletter"]
 class LinkedinPost(BaseModel):
     title: str
     post: str
+    posted: bool = False
 
 
 class TwitterPost(BaseModel):
     post: str
+    posted: bool = False
 
 
 class YouTubeDescription(BaseModel):
     title: str
     description: str
     video_url_drive: str
+    posted: bool = False
 
 
 class State(MessagesState):
@@ -106,7 +114,7 @@ def write_linkedin_post(
     tool_call_id: Annotated[str, InjectedToolCallId],
     state: Annotated[State, InjectedState],
 ) -> Command:
-    """Write a LinkedIn post about a given topic and post it"""
+    """Write a LinkedIn post about a given topic"""
     post = model.with_structured_output(LinkedinPost).invoke(
         post_generation_prompt.format(
             topic=topic,
@@ -122,7 +130,7 @@ def write_linkedin_post(
             "new_linkedin_posts": [post],
             "messages": [
                 ToolMessage(
-                    f"Linkedin post written: {post.title}",  # type: ignore
+                    f"LinkedIn post written: {post.title}",
                     tool_call_id=tool_call_id,
                 )
             ],
@@ -150,12 +158,14 @@ def write_twitter_post(
             past_posts=state["twitter_posts"] + state["new_twitter_posts"],
         )
     )
+    # Set posted to False since this is just generated content
+    post.posted = False
     return Command(
         update={
             "new_twitter_posts": [post],
             "messages": [
                 ToolMessage(
-                    f"Twitter post written: {post.post}",  # type: ignore
+                    f"Twitter post written: {post.post}",
                     tool_call_id=tool_call_id,
                 )
             ],
@@ -171,7 +181,7 @@ def write_youtube_description(
     tool_call_id: Annotated[str, InjectedToolCallId],
     state: Annotated[State, InjectedState],
 ) -> Command:
-    """Write a YouTube video description about a given topic and post it"""
+    """Write a YouTube video description about a given topic"""
     description = model.with_structured_output(YouTubeDescription).invoke(
         youtube_description_prompt.format(
             topic=topic,
@@ -182,12 +192,14 @@ def write_youtube_description(
             + state["new_youtube_descriptions"],
         )
     )
+    # Set posted to False since this is just generated content
+    description.posted = False
     return Command(
         update={
             "new_youtube_descriptions": [description],
             "messages": [
                 ToolMessage(
-                    f"YouTube description written: {description.title}",  # type: ignore
+                    f"YouTube description written: {description.title}",
                     tool_call_id=tool_call_id,
                 )
             ],
@@ -195,23 +207,253 @@ def write_youtube_description(
     )
 
 
-agent_prompt = """ You are a world-class content strategist, you lead a team of copywrites.
+def post_to_linkedin(
+    title: str,
+    post: str,
+    tool_call_id: Annotated[str, InjectedToolCallId],
+    visibility: str = "connections",
+    schedule_time: str | None = None,
+) -> Command:
+    """Post content to LinkedIn using Selenium automation. Can schedule posts for later."""
+
+    text = post
+
+    try:
+        # Get LinkedIn credentials from environment
+        email = os.getenv("LINKEDIN_EMAIL")
+        password = os.getenv("LINKEDIN_PASSWORD")
+
+        if not email or not password:
+            return Command(
+                update={
+                    "messages": [
+                        ToolMessage(
+                            "LinkedIn credentials not found. Please set LINKEDIN_EMAIL and LINKEDIN_PASSWORD environment variables.",
+                            tool_call_id=tool_call_id,
+                        )
+                    ],
+                }
+            )
+
+        # Initialize LinkedIn poster
+        poster = LinkedInSeleniumPoster(headless=False)
+
+        try:
+            # Login to LinkedIn
+            if poster.login(email, password):
+                # Parse schedule time if provided
+                schedule_datetime = None
+                if schedule_time:
+                    try:
+                        schedule_datetime = datetime.datetime.fromisoformat(
+                            schedule_time.replace("Z", "+00:00")
+                        )
+                    except ValueError:
+                        return Command(
+                            update={
+                                "messages": [
+                                    ToolMessage(
+                                        f"Invalid date format for schedule_time: {schedule_time}. Use ISO format (YYYY-MM-DDTHH:MM:SS)",
+                                        tool_call_id=tool_call_id,
+                                    )
+                                ],
+                            }
+                        )
+
+                # Post the content (scheduled or immediate)
+                if schedule_datetime:
+                    success = poster.schedule_post(text, schedule_datetime, visibility)
+                    if success:
+                        result = f"Successfully scheduled LinkedIn post for {schedule_datetime.strftime('%Y-%m-%d %H:%M')} with {visibility} visibility"
+                        # Save the scheduled post to state
+                        linkedin_post = LinkedinPost(
+                            title=f"Scheduled Post - {schedule_datetime.strftime('%Y-%m-%d %H:%M')}",
+                            post=text,
+                            posted=True,
+                        )
+                        return Command(
+                            update={
+                                "new_linkedin_posts": [linkedin_post],
+                                "messages": [
+                                    ToolMessage(
+                                        f"LinkedIn post result: {result}",
+                                        tool_call_id=tool_call_id,
+                                    )
+                                ],
+                            }
+                        )
+                    else:
+                        result = "Failed to schedule LinkedIn post"
+                else:
+                    success = poster.post_text(text, visibility)
+                    if success:
+                        result = f"Successfully posted to LinkedIn with {visibility} visibility"
+                        # Save the posted content to state
+                        linkedin_post = LinkedinPost(
+                            title=f"Posted - {datetime.datetime.now().strftime('%Y-%m-%d %H:%M')}",
+                            post=text,
+                            posted=True,
+                        )
+                        return Command(
+                            update={
+                                "new_linkedin_posts": [linkedin_post],
+                                "messages": [
+                                    ToolMessage(
+                                        f"LinkedIn post result: {result}",
+                                        tool_call_id=tool_call_id,
+                                    )
+                                ],
+                            }
+                        )
+                    else:
+                        result = "Failed to post to LinkedIn"
+            else:
+                result = "Failed to login to LinkedIn"
+
+        finally:
+            poster.close()
+
+        return Command(
+            update={
+                "messages": [
+                    ToolMessage(
+                        f"LinkedIn post result: {result}",
+                        tool_call_id=tool_call_id,
+                    )
+                ],
+            }
+        )
+
+    except Exception as e:
+        return Command(
+            update={
+                "messages": [
+                    ToolMessage(
+                        f"Error posting to LinkedIn: {str(e)}",
+                        tool_call_id=tool_call_id,
+                    )
+                ],
+            }
+        )
+
+
+def upload_to_youtube(
+    video_path: str,
+    title: str,
+    description: str,
+    tool_call_id: Annotated[str, InjectedToolCallId],
+    publish_at: str | None = None,
+    privacy_status: str = "private",
+) -> Command:
+    """Upload a video to YouTube with the given metadata"""
+    try:
+        # Parse publish_at if provided
+        publish_datetime = None
+        if publish_at:
+            try:
+                publish_datetime = datetime.datetime.fromisoformat(
+                    publish_at.replace("Z", "+00:00")
+                )
+            except ValueError:
+                return Command(
+                    update={
+                        "messages": [
+                            ToolMessage(
+                                f"Invalid date format for publish_at: {publish_at}. Use ISO format (YYYY-MM-DDTHH:MM:SS)",
+                                tool_call_id=tool_call_id,
+                            )
+                        ],
+                    }
+                )
+
+        # Upload the video
+        video_id = upload_local_video(
+            video_path=video_path,
+            title=title,
+            description=description,
+            publish_at=publish_datetime,
+            privacy_status="private",
+            tags=["davia", "ai", "development", "automation"],
+        )
+
+        result = "successefuly uploaded" + video_id
+
+        # Save the uploaded video description to state
+        youtube_description = YouTubeDescription(
+            title=title,
+            description=description,
+            video_url_drive=f"https://www.youtube.com/watch?v={video_id}",
+            posted=True,
+        )
+
+        return Command(
+            update={
+                "new_youtube_descriptions": [youtube_description],
+                "messages": [
+                    ToolMessage(
+                        f"YouTube upload result: {result}",
+                        tool_call_id=tool_call_id,
+                    )
+                ],
+            }
+        )
+
+    except FileNotFoundError:
+        return Command(
+            update={
+                "messages": [
+                    ToolMessage(
+                        f"Video file not found: {video_path}",
+                        tool_call_id=tool_call_id,
+                    )
+                ],
+            }
+        )
+    except Exception as e:
+        return Command(
+            update={
+                "messages": [
+                    ToolMessage(
+                        f"Error uploading to YouTube: {str(e)}",
+                        tool_call_id=tool_call_id,
+                    )
+                ],
+            }
+        )
+
+
+agent_prompt = f""" You are a world-class content strategist, you lead a team of copywrites.
 You work for a company Davia that sells a product called "Davia". It is a tool that helps people build front end for their applications.
 The goal of the company is to allow builders to build powerful AI applications without coding or using their existing python backend.
 You need to maintain the company's social media presence and create content for the company's social media accounts.
 Your goal is to post videos on Youtube, post on Linkedin and Twitter, at least once every two days.
 You conduct weekly check-ins with the team to discuss posts for the next week.
 
+Current date: {datetime.datetime.now().strftime("%Y-%m-%d")}
+
 Use the following tools to help you:
-- write_linkedin_post
-- write_twitter_post
-- write_youtube_description
+- write_linkedin_post: Write LinkedIn post content
+- write_twitter_post: Write Twitter post content  
+- write_youtube_description: Write YouTube video descriptions
+- post_to_linkedin: Actually post content to LinkedIn (can schedule posts for later, requires LINKEDIN_EMAIL and LINKEDIN_PASSWORD environment variables)
+- upload_to_youtube: Upload videos to YouTube (requires Google OAuth setup)
+
+For LinkedIn scheduling, you can specify a schedule_time parameter in ISO format (YYYY-MM-DDTHH:MM:SS) to schedule posts for later.
+
+IMPORTANT: When providing arguments to tools, do NOT use single quotes (') or double quotes (") around the values. Provide the raw text without any quotation marks.
 
 Never use the tools if you don't have to.
 Never try to do something yourself if you can use the tools.
 """
 
-tools = [write_linkedin_post, write_twitter_post, write_youtube_description]
+# Create tools list with conditional inclusion based on availability
+tools = [
+    write_linkedin_post,
+    write_twitter_post,
+    write_youtube_description,
+    post_to_linkedin,
+    upload_to_youtube,
+]
 
 model_with_tools = model.bind_tools(tools)
 
@@ -221,26 +463,89 @@ def agent(state: State):
 
 
 def load_state(state: State):
+    # Load data from Supabase and filter out invalid records
+    linkedin_data = supabase.table("linkedin_posts").select("*").execute().data
+    twitter_data = supabase.table("twitter_posts").select("*").execute().data
+    youtube_data = supabase.table("youtube_descriptions").select("*").execute().data
+
+    # Filter out records with None values for required fields
+    valid_linkedin_posts = []
+    for post in linkedin_data:
+        if post.get("title") is not None and post.get("post") is not None:
+            valid_linkedin_posts.append(
+                LinkedinPost(
+                    title=post["title"],
+                    post=post["post"],
+                    posted=True,  # All existing data is considered posted
+                )
+            )
+
+    valid_twitter_posts = []
+    for post in twitter_data:
+        if post.get("post") is not None:
+            valid_twitter_posts.append(
+                TwitterPost(
+                    post=post["post"],
+                    posted=True,  # All existing data is considered posted
+                )
+            )
+
+    valid_youtube_descriptions = []
+    for desc in youtube_data:
+        if (
+            desc.get("title") is not None
+            and desc.get("description") is not None
+            and desc.get("video_url_drive") is not None
+        ):
+            valid_youtube_descriptions.append(
+                YouTubeDescription(
+                    title=desc["title"],
+                    description=desc["description"],
+                    video_url_drive=desc["video_url_drive"],
+                    posted=True,  # All existing data is considered posted
+                )
+            )
+
     return {
-        "linkedin_posts": supabase.table("linkedin_posts").select("*").execute().data,
-        "twitter_posts": supabase.table("twitter_posts").select("*").execute().data,
-        "youtube_descriptions": supabase.table("youtube_descriptions")
-        .select("*")
-        .execute()
-        .data,
+        "linkedin_posts": valid_linkedin_posts,
+        "twitter_posts": valid_twitter_posts,
+        "youtube_descriptions": valid_youtube_descriptions,
     }
 
 
 def save_state(state: State):
     if state.get("new_linkedin_posts"):
-        data = [p.model_dump() for p in state["new_linkedin_posts"]]
-        supabase.table("linkedin_posts").insert(data).execute()
+        # Only save LinkedIn posts that were actually posted
+        posted_linkedin_posts = [p for p in state["new_linkedin_posts"] if p.posted]
+        if posted_linkedin_posts:
+            # Exclude the 'posted' field since it doesn't exist in the database
+            data = [{"title": p.title, "post": p.post} for p in posted_linkedin_posts]
+            supabase.table("linkedin_posts").insert(data).execute()
+
     if state.get("new_twitter_posts"):
-        data = [p.model_dump() for p in state["new_twitter_posts"]]
-        supabase.table("twitter_posts").insert(data).execute()
+        # Only save Twitter posts that were actually posted
+        posted_twitter_posts = [p for p in state["new_twitter_posts"] if p.posted]
+        if posted_twitter_posts:
+            # Exclude the 'posted' field since it doesn't exist in the database
+            data = [{"post": p.post} for p in posted_twitter_posts]
+            supabase.table("twitter_posts").insert(data).execute()
+
     if state.get("new_youtube_descriptions"):
-        data = [p.model_dump() for p in state["new_youtube_descriptions"]]
-        supabase.table("youtube_descriptions").insert(data).execute()
+        # Only save YouTube descriptions that were actually uploaded
+        posted_youtube_descriptions = [
+            p for p in state["new_youtube_descriptions"] if p.posted
+        ]
+        if posted_youtube_descriptions:
+            # Exclude the 'posted' field since it doesn't exist in the database
+            data = [
+                {
+                    "title": p.title,
+                    "description": p.description,
+                    "video_url_drive": p.video_url_drive,
+                }
+                for p in posted_youtube_descriptions
+            ]
+            supabase.table("youtube_descriptions").insert(data).execute()
 
 
 def custom_tools_condition(
