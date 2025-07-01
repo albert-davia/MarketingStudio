@@ -82,6 +82,7 @@ class LinkedinPost(BaseModel):
     title: str
     post: str
     posted: bool = False
+    post_date: str | None = None
 
 
 class TwitterPost(BaseModel):
@@ -125,6 +126,7 @@ def write_linkedin_post(
             past_posts=state["linkedin_posts"] + state["new_linkedin_posts"],
         )
     )
+    post.posted = False
     return Command(
         update={
             "new_linkedin_posts": [post],
@@ -158,7 +160,6 @@ def write_twitter_post(
             past_posts=state["twitter_posts"] + state["new_twitter_posts"],
         )
     )
-    # Set posted to False since this is just generated content
     post.posted = False
     return Command(
         update={
@@ -192,7 +193,6 @@ def write_youtube_description(
             + state["new_youtube_descriptions"],
         )
     )
-    # Set posted to False since this is just generated content
     description.posted = False
     return Command(
         update={
@@ -208,15 +208,14 @@ def write_youtube_description(
 
 
 def post_to_linkedin(
-    title: str,
-    post: str,
+    linkedin_post: LinkedinPost,
     tool_call_id: Annotated[str, InjectedToolCallId],
     visibility: str = "connections",
     schedule_time: str | None = None,
 ) -> Command:
     """Post content to LinkedIn using Selenium automation. Can schedule posts for later."""
 
-    text = post
+    text = linkedin_post.post
 
     try:
         # Get LinkedIn credentials from environment
@@ -265,15 +264,16 @@ def post_to_linkedin(
                     success = poster.schedule_post(text, schedule_datetime, visibility)
                     if success:
                         result = f"Successfully scheduled LinkedIn post for {schedule_datetime.strftime('%Y-%m-%d %H:%M')} with {visibility} visibility"
-                        # Save the scheduled post to state
-                        linkedin_post = LinkedinPost(
-                            title=f"Scheduled Post - {schedule_datetime.strftime('%Y-%m-%d %H:%M')}",
-                            post=text,
+                        # Save the scheduled post to state with original title and scheduled date
+                        posted_linkedin_post = LinkedinPost(
+                            title=linkedin_post.title,
+                            post=linkedin_post.post,
                             posted=True,
+                            post_date=schedule_datetime.isoformat(),
                         )
                         return Command(
                             update={
-                                "new_linkedin_posts": [linkedin_post],
+                                "new_linkedin_posts": [posted_linkedin_post],
                                 "messages": [
                                     ToolMessage(
                                         f"LinkedIn post result: {result}",
@@ -288,15 +288,17 @@ def post_to_linkedin(
                     success = poster.post_text(text, visibility)
                     if success:
                         result = f"Successfully posted to LinkedIn with {visibility} visibility"
-                        # Save the posted content to state
-                        linkedin_post = LinkedinPost(
-                            title=f"Posted - {datetime.datetime.now().strftime('%Y-%m-%d %H:%M')}",
-                            post=text,
+                        # Save the posted content to state with original title and current date
+                        current_time = datetime.datetime.now()
+                        posted_linkedin_post = LinkedinPost(
+                            title=linkedin_post.title,
+                            post=linkedin_post.post,
                             posted=True,
+                            post_date=current_time.isoformat(),
                         )
                         return Command(
                             update={
-                                "new_linkedin_posts": [linkedin_post],
+                                "new_linkedin_posts": [posted_linkedin_post],
                                 "messages": [
                                     ToolMessage(
                                         f"LinkedIn post result: {result}",
@@ -432,11 +434,13 @@ You conduct weekly check-ins with the team to discuss posts for the next week.
 Current date: {datetime.datetime.now().strftime("%Y-%m-%d")}
 
 Use the following tools to help you:
-- write_linkedin_post: Write LinkedIn post content
+- write_linkedin_post: Write LinkedIn post content (returns a LinkedinPost object)
 - write_twitter_post: Write Twitter post content  
 - write_youtube_description: Write YouTube video descriptions
-- post_to_linkedin: Actually post content to LinkedIn (can schedule posts for later, requires LINKEDIN_EMAIL and LINKEDIN_PASSWORD environment variables)
+- post_to_linkedin: Actually post a LinkedinPost object to LinkedIn (can schedule posts for later, requires LINKEDIN_EMAIL and LINKEDIN_PASSWORD environment variables)
 - upload_to_youtube: Upload videos to YouTube (requires Google OAuth setup)
+
+WORKFLOW: When posting to LinkedIn, first use write_linkedin_post to generate content, then pass the returned LinkedinPost object to post_to_linkedin.
 
 For LinkedIn scheduling, you can specify a schedule_time parameter in ISO format (YYYY-MM-DDTHH:MM:SS) to schedule posts for later.
 
@@ -477,6 +481,9 @@ def load_state(state: State):
                     title=post["title"],
                     post=post["post"],
                     posted=True,  # All existing data is considered posted
+                    post_date=post.get(
+                        "post_date"
+                    ),  # Load existing post_date if available
                 )
             )
 
@@ -518,9 +525,31 @@ def save_state(state: State):
         # Only save LinkedIn posts that were actually posted
         posted_linkedin_posts = [p for p in state["new_linkedin_posts"] if p.posted]
         if posted_linkedin_posts:
-            # Exclude the 'posted' field since it doesn't exist in the database
-            data = [{"title": p.title, "post": p.post} for p in posted_linkedin_posts]
-            supabase.table("linkedin_posts").insert(data).execute()
+            # Create data with post_date, but handle potential column missing
+            data = []
+            for p in posted_linkedin_posts:
+                post_data = {"title": p.title, "post": p.post}
+                if p.post_date is not None:
+                    post_data["post_date"] = p.post_date
+                data.append(post_data)
+
+            try:
+                supabase.table("linkedin_posts").insert(data).execute()
+                print(f"✅ Saved {len(data)} LinkedIn posts to database")
+            except Exception as e:
+                print(f"⚠️  Error saving LinkedIn posts: {e}")
+                # Try without post_date if column doesn't exist
+                try:
+                    fallback_data = [
+                        {"title": p.title, "post": p.post}
+                        for p in posted_linkedin_posts
+                    ]
+                    supabase.table("linkedin_posts").insert(fallback_data).execute()
+                    print(
+                        f"✅ Saved {len(fallback_data)} LinkedIn posts without post_date"
+                    )
+                except Exception as e2:
+                    print(f"❌ Failed to save LinkedIn posts: {e2}")
 
     if state.get("new_twitter_posts"):
         # Only save Twitter posts that were actually posted
