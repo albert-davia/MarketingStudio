@@ -347,11 +347,12 @@ def upload_to_youtube(
     video_path: str,
     title: str,
     description: str,
+    channel: Literal["albertthebuilder", "davia"],
     tool_call_id: Annotated[str, InjectedToolCallId],
     publish_at: str | None = None,
     privacy_status: str = "private",
 ) -> Command:
-    """Upload a video to YouTube with the given metadata"""
+    """Upload a video to YouTube with the given metadata, channel is the channel to upload to it must have been specified by the user before"""
     try:
         # Parse publish_at if provided
         publish_datetime = None
@@ -377,6 +378,7 @@ def upload_to_youtube(
             video_path=video_path,
             title=title,
             description=description,
+            channel=channel,
             publish_at=publish_datetime,
             privacy_status="private",
             tags=["davia", "ai", "development", "automation"],

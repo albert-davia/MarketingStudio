@@ -136,7 +136,8 @@ ENV/
 env.bak/
 venv.bak/
 client_secret.json
-token.pickle
+token_albertthebuilder.pickle
+token_davia.pickle
 
 # Spyder project settings
 .spyderproject
