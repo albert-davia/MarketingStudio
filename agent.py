@@ -67,6 +67,8 @@ Instructions:
 8. Keep it under 5000 characters (YouTube limit)
 9. Make it searchable and engaging
 
+this is the video summary: {video_summary}
+
 Use the past descriptions as a reference to write the new description.
 
 Past descriptions:
@@ -177,6 +179,7 @@ def write_twitter_post(
 def write_youtube_description(
     topic: str,
     target_audience: str,
+    video_summary: str,
     content_type: str,
     goal: str,
     tool_call_id: Annotated[str, InjectedToolCallId],
@@ -189,6 +192,7 @@ def write_youtube_description(
             target_audience=target_audience,
             content_type=content_type,
             goal=goal,
+            video_summary=video_summary,
             past_descriptions=state["youtube_descriptions"]
             + state["new_youtube_descriptions"],
         )
