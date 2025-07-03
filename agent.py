@@ -17,6 +17,7 @@ from supabase import Client, create_client
 
 # Import LinkedIn and YouTube functionality
 from linkedin_selenium_poster import LinkedInSeleniumPoster
+from twitter_selenium_poster import post_tweet
 from upload_youtube import upload_local_video
 
 supabase: Client = create_client(os.environ["SUPABASE_URL"], os.environ["SUPABASE_KEY"])
@@ -151,7 +152,7 @@ def write_twitter_post(
     tool_call_id: Annotated[str, InjectedToolCallId],
     state: Annotated[State, InjectedState],
 ) -> Command:
-    """Write a Twitter post about a given topic and post it"""
+    """Write a Twitter post about a given topic"""
     post = model.with_structured_output(TwitterPost).invoke(
         post_generation_prompt.format(
             topic=topic,
@@ -430,6 +431,78 @@ def upload_to_youtube(
         )
 
 
+def post_to_twitter(
+    twitter_post: TwitterPost,
+    tool_call_id: Annotated[str, InjectedToolCallId],
+    schedule_time: str | None = None,
+) -> Command:
+    """Post content to Twitter using Selenium automation. Can schedule posts for later."""
+
+    text = twitter_post.post
+
+    try:
+        # Parse schedule time if provided
+        schedule_datetime = None
+        if schedule_time:
+            try:
+                schedule_datetime = datetime.datetime.fromisoformat(
+                    schedule_time.replace("Z", "+00:00")
+                )
+            except ValueError:
+                return Command(
+                    update={
+                        "messages": [
+                            ToolMessage(
+                                f"Invalid date format for schedule_time: {schedule_time}. Use ISO format (YYYY-MM-DDTHH:MM:SS)",
+                                tool_call_id=tool_call_id,
+                            )
+                        ],
+                    }
+                )
+
+        # Use the post_tweet function to post content
+        post_tweet(text, schedule_datetime)
+
+        if schedule_datetime:
+            result = f"Successfully scheduled Twitter post for {schedule_datetime.strftime('%Y-%m-%d %H:%M')}"
+            # Save the scheduled post to state
+            posted_twitter_post = TwitterPost(
+                post=twitter_post.post,
+                posted=True,
+            )
+        else:
+            result = "Successfully posted to Twitter"
+            # Save the posted content to state
+            posted_twitter_post = TwitterPost(
+                post=twitter_post.post,
+                posted=True,
+            )
+
+        return Command(
+            update={
+                "new_twitter_posts": [posted_twitter_post],
+                "messages": [
+                    ToolMessage(
+                        f"Twitter post result: {result}",
+                        tool_call_id=tool_call_id,
+                    )
+                ],
+            }
+        )
+
+    except Exception as e:
+        return Command(
+            update={
+                "messages": [
+                    ToolMessage(
+                        f"Error posting to Twitter: {str(e)}",
+                        tool_call_id=tool_call_id,
+                    )
+                ],
+            }
+        )
+
+
 agent_prompt = f""" You are a world-class content strategist, you lead a team of copywrites.
 You work for a company Davia that sells a product called "Davia". It is a tool that helps people build front end for their applications.
 The goal of the company is to allow builders to build powerful AI applications without coding or using their existing python backend.
@@ -441,14 +514,17 @@ Current date: {datetime.datetime.now().strftime("%Y-%m-%d")}
 
 Use the following tools to help you:
 - write_linkedin_post: Write LinkedIn post content (returns a LinkedinPost object)
-- write_twitter_post: Write Twitter post content  
+- write_twitter_post: Write Twitter post content (returns a TwitterPost object)
 - write_youtube_description: Write YouTube video descriptions
 - post_to_linkedin: Actually post a LinkedinPost object to LinkedIn (can schedule posts for later, requires LINKEDIN_EMAIL and LINKEDIN_PASSWORD environment variables)
+- post_to_twitter: Actually post a TwitterPost object to Twitter (can schedule posts for later, requires TWITTER_EMAIL and TWITTER_PASSWORD environment variables)
 - upload_to_youtube: Upload videos to YouTube (requires Google OAuth setup)
 
-WORKFLOW: When posting to LinkedIn, first use write_linkedin_post to generate content, then pass the returned LinkedinPost object to post_to_linkedin.
+WORKFLOW: 
+- For LinkedIn: First use write_linkedin_post to generate content, then pass the returned LinkedinPost object to post_to_linkedin.
+- For Twitter: First use write_twitter_post to generate content, then pass the returned TwitterPost object to post_to_twitter.
 
-For LinkedIn scheduling, you can specify a schedule_time parameter in ISO format (YYYY-MM-DDTHH:MM:SS) to schedule posts for later.
+For LinkedIn and Twitter scheduling, you can specify a schedule_time parameter in ISO format (YYYY-MM-DDTHH:MM:SS) to schedule posts for later.
 
 IMPORTANT: When providing arguments to tools, do NOT use single quotes (') or double quotes (") around the values. Provide the raw text without any quotation marks.
 
@@ -462,6 +538,7 @@ tools = [
     write_twitter_post,
     write_youtube_description,
     post_to_linkedin,
+    post_to_twitter,
     upload_to_youtube,
 ]
 
