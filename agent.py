@@ -76,6 +76,16 @@ Past descriptions:
 {past_descriptions}
 """
 
+
+def custom_reducer(list1: list[Any], list2: list[Any]) -> list[Any]:
+    for item2 in list2:
+        if isinstance(item2, DeleteTask):
+            list1 = [item for item in list1 if item.id != item2.id]
+        else:
+            list1.append(item2)
+    return list1
+
+
 goals = ["engagement", "clicks", "conversions", "leads"]
 
 content_types = ["viral thread", "sales page", "cold email", "newsletter"]
@@ -100,6 +110,19 @@ class YouTubeDescription(BaseModel):
     posted: bool = False
 
 
+class DeleteTask(BaseModel):
+    id: int
+
+
+class Task(BaseModel):
+    id: int | None = None
+    created_at: datetime.datetime | None = None
+    time: datetime.datetime | None = None
+    description: str | None = None
+    status: Literal["pending", "posted"] = "pending"
+    content_type: Literal["youtube", "linkedin", "twitter"] = "youtube"
+
+
 class State(MessagesState):
     linkedin_posts: Annotated[list[LinkedinPost], operator.add]
     new_linkedin_posts: Annotated[list[LinkedinPost], operator.add]
@@ -107,6 +130,8 @@ class State(MessagesState):
     new_twitter_posts: Annotated[list[TwitterPost], operator.add]
     youtube_descriptions: Annotated[list[YouTubeDescription], operator.add]
     new_youtube_descriptions: Annotated[list[YouTubeDescription], operator.add]
+    tasks: Annotated[list[Task], custom_reducer]
+    html_week_ahead: str
 
 
 def write_linkedin_post(
@@ -503,6 +528,199 @@ def post_to_twitter(
         )
 
 
+def add_task(
+    description: str,
+    time: datetime.datetime,
+    content_type: Literal["youtube", "linkedin", "twitter"],
+    tool_call_id: Annotated[str, InjectedToolCallId],
+    state: Annotated[State, InjectedState],
+) -> Command:
+    """Add a task to the state"""
+    task = Task(
+        created_at=datetime.datetime.now(),
+        description=description,
+        time=time,
+        status="pending",
+        content_type=content_type,
+    )
+    return Command(update={"tasks": [task]})
+
+
+def delete_task(
+    id: int,
+    tool_call_id: Annotated[str, InjectedToolCallId],
+    state: Annotated[State, InjectedState],
+) -> Command:
+    """Delete a task from the state"""
+    return Command(update={"tasks": [DeleteTask(id=id)]})
+
+
+def visualize_tasks(
+    tool_call_id: Annotated[str, InjectedToolCallId],
+    state: Annotated[State, InjectedState],
+) -> Command:
+    """Visualize the week ahead with tasks using matplotlib"""
+    import base64
+    import io
+    from datetime import datetime, timedelta
+
+    import matplotlib.pyplot as plt
+
+    # Get current date and calculate week range (Sunday to Sunday)
+    today = datetime.now()
+    # Find the most recent Sunday
+    days_since_sunday = (
+        today.weekday() + 1
+    )  # Monday=0, so Sunday=6, but we want days since Sunday
+    if days_since_sunday == 7:  # If today is Sunday
+        days_since_sunday = 0
+    start_of_week = today - timedelta(days=days_since_sunday)
+    end_of_week = start_of_week + timedelta(days=6)
+
+    # Get tasks from state
+    tasks = state.get("tasks", [])
+
+    # Filter tasks for this week
+    week_tasks = []
+    for task in tasks:
+        if task.time and start_of_week <= task.time <= end_of_week:
+            week_tasks.append(task)
+
+    # Create the figure and axis
+    fig, ax = plt.subplots(figsize=(12, 8))
+
+    # Set up the calendar grid
+    days = [
+        "Sunday",
+        "Monday",
+        "Tuesday",
+        "Wednesday",
+        "Thursday",
+        "Friday",
+        "Saturday",
+    ]
+    hours = list(range(24))
+
+    # Create a grid for the week
+    for i, day in enumerate(days):
+        day_date = start_of_week + timedelta(days=i)
+        ax.text(
+            i + 0.5,
+            23.5,
+            f"{day}\n{day_date.strftime('%m/%d')}",
+            ha="center",
+            va="top",
+            fontsize=10,
+            fontweight="bold",
+        )
+
+        # Draw day boundaries
+        ax.axvline(x=i, color="gray", alpha=0.3)
+        ax.axvline(x=i + 1, color="gray", alpha=0.3)
+
+    # Draw hour lines
+    for hour in hours:
+        ax.axhline(y=hour, color="lightgray", alpha=0.3)
+
+    # Plot tasks
+    colors = {"youtube": "red", "linkedin": "blue", "twitter": "green"}
+    task_height = 0.8
+
+    for task in week_tasks:
+        if task.time:
+            # Calculate position
+            day_index = (
+                task.time.weekday() + 1
+            )  # Convert to 0-6 range, then add 1 for Sunday=0
+            if day_index == 7:  # Sunday
+                day_index = 0
+            hour = task.time.hour + task.time.minute / 60
+
+            # Create rectangle for task
+            rect = plt.Rectangle(
+                (day_index, hour - task_height / 2),
+                1,
+                task_height,
+                facecolor=colors.get(task.content_type, "gray"),
+                alpha=0.7,
+                edgecolor="black",
+                linewidth=1,
+            )
+            ax.add_patch(rect)
+
+            # Add task text
+            ax.text(
+                day_index + 0.5,
+                hour,
+                f"{task.time.strftime('%H:%M')}\n{task.description[:20]}...",
+                ha="center",
+                va="center",
+                fontsize=8,
+                fontweight="bold",
+                color="white",
+            )
+
+    # Set up the plot
+    ax.set_xlim(0, 7)
+    ax.set_ylim(0, 24)
+    ax.set_xticks(range(7))
+    ax.set_xticklabels(days)
+    ax.set_yticks(range(0, 25, 2))
+    ax.set_yticklabels([f"{h:02d}:00" for h in range(0, 25, 2)])
+    ax.set_ylabel("Time")
+    ax.set_title(
+        f"Week Ahead Schedule ({start_of_week.strftime('%m/%d')} - {end_of_week.strftime('%m/%d')})"
+    )
+
+    # Add legend
+    legend_elements = [
+        plt.Rectangle(
+            (0, 0), 1, 1, facecolor=color, alpha=0.7, label=content_type.title()
+        )
+        for content_type, color in colors.items()
+    ]
+    ax.legend(handles=legend_elements, loc="upper right")
+
+    # Rotate x-axis labels for better readability
+    plt.xticks(rotation=45)
+
+    # Adjust layout
+    plt.tight_layout()
+
+    # Save to bytes buffer
+    buf = io.BytesIO()
+    plt.savefig(buf, format="png", dpi=150, bbox_inches="tight")
+    buf.seek(0)
+
+    # Convert to base64 for display
+    img_base64 = base64.b64encode(buf.getvalue()).decode()
+
+    # Close the plot to free memory
+    plt.close()
+
+    # Create HTML to display the image
+    html_content = f"""
+    <div style="text-align: center;">
+        <h3>Week Ahead Schedule</h3>
+        <img src="data:image/png;base64,{img_base64}" style="max-width: 100%; height: auto;">
+        <p><strong>Total Tasks:</strong> {len(week_tasks)}</p>
+        <p><strong>Period:</strong> {start_of_week.strftime("%B %d, %Y")} - {end_of_week.strftime("%B %d, %Y")}</p>
+    </div>
+    """
+
+    return Command(
+        update={
+            "html_week_ahead": html_content,
+            "messages": [
+                ToolMessage(
+                    f"Week ahead visualization created with {len(week_tasks)} tasks",
+                    tool_call_id=tool_call_id,
+                )
+            ],
+        }
+    )
+
+
 agent_prompt = f""" You are a world-class content strategist, you lead a team of copywrites.
 You work for a company Davia that sells a product called "Davia". It is a tool that helps people build front end for their applications.
 The goal of the company is to allow builders to build powerful AI applications without coding or using their existing python backend.
@@ -531,6 +749,7 @@ IMPORTANT: When providing arguments to tools, do NOT use single quotes (') or do
 Never use the tools if you don't have to.
 Never try to do something yourself if you can use the tools.
 """
+
 
 # Create tools list with conditional inclusion based on availability
 tools = [
