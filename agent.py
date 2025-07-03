@@ -129,13 +129,13 @@ def write_linkedin_post(
             past_posts=state["linkedin_posts"] + state["new_linkedin_posts"],
         )
     )
-    post.posted = False
+    post.posted = False  # type: ignore
     return Command(
         update={
             "new_linkedin_posts": [post],
             "messages": [
                 ToolMessage(
-                    f"LinkedIn post written: {post.title}",
+                    f"LinkedIn post written: {post.title}",  # type: ignore
                     tool_call_id=tool_call_id,
                 )
             ],
@@ -163,13 +163,13 @@ def write_twitter_post(
             past_posts=state["twitter_posts"] + state["new_twitter_posts"],
         )
     )
-    post.posted = False
+    post.posted = False  # type: ignore
     return Command(
         update={
             "new_twitter_posts": [post],
             "messages": [
                 ToolMessage(
-                    f"Twitter post written: {post.post}",
+                    f"Twitter post written: {post.post}",  # type: ignore
                     tool_call_id=tool_call_id,
                 )
             ],
@@ -198,13 +198,13 @@ def write_youtube_description(
             + state["new_youtube_descriptions"],
         )
     )
-    description.posted = False
+    description.posted = False  # type: ignore
     return Command(
         update={
             "new_youtube_descriptions": [description],
             "messages": [
                 ToolMessage(
-                    f"YouTube description written: {description.title}",
+                    f"YouTube description written: {description.title}",  # type: ignore
                     tool_call_id=tool_call_id,
                 )
             ],
@@ -520,7 +520,7 @@ Use the following tools to help you:
 - post_to_twitter: Actually post a TwitterPost object to Twitter (can schedule posts for later, requires TWITTER_EMAIL and TWITTER_PASSWORD environment variables)
 - upload_to_youtube: Upload videos to YouTube (requires Google OAuth setup)
 
-WORKFLOW: 
+WORKFLOW:
 - For LinkedIn: First use write_linkedin_post to generate content, then pass the returned LinkedinPost object to post_to_linkedin.
 - For Twitter: First use write_twitter_post to generate content, then pass the returned TwitterPost object to post_to_twitter.
 

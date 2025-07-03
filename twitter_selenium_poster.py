@@ -341,9 +341,9 @@ class TwitterSeleniumPoster:
                             "arguments[0].style.display = 'none';", overlay
                         )
                         print("✅ Removed overlay element")
-                    except:
+                    except Exception:
                         pass
-            except:
+            except Exception:
                 pass
 
             # Month names for mapping
