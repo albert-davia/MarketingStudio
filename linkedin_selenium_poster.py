@@ -40,18 +40,36 @@ class LinkedInSeleniumPoster:
     by directly interacting with the LinkedIn web interface.
     """
 
-    def __init__(self, headless: bool = False, wait_timeout: int = 10):
+    def __init__(
+        self,
+        headless: bool = False,
+        wait_timeout: int = 10,
+        user_data_dir: str | None = None,
+    ):
         """
         Initialize the LinkedIn Selenium Poster.
 
         Args:
             headless: Whether to run browser in headless mode
             wait_timeout: Timeout for waiting for elements (seconds)
+            user_data_dir: Directory to store browser cache/cookies. If None, uses temp directory
         """
         self.driver = None
         self.wait_timeout = wait_timeout
         self.headless = headless
         self.is_logged_in = False
+
+        # Set up user data directory for persistent cache/cookies
+        if user_data_dir is None:
+            # Use a fixed directory in the project root (same location as the script)
+            script_dir = os.path.dirname(os.path.abspath(__file__))
+            self.user_data_dir = os.path.join(script_dir, "linkedin_browser_data")
+        else:
+            self.user_data_dir = user_data_dir
+
+        # Create the directory if it doesn't exist
+        os.makedirs(self.user_data_dir, exist_ok=True)
+        logger.info(f"Using browser data directory: {self.user_data_dir}")
 
     def setup_driver(self):
         """Set up the Chrome WebDriver with appropriate options."""
@@ -59,6 +77,9 @@ class LinkedInSeleniumPoster:
 
         if self.headless:
             chrome_options.add_argument("--headless")
+
+        # Add user data directory for persistent cache/cookies
+        chrome_options.add_argument(f"--user-data-dir={self.user_data_dir}")
 
         # Add other useful options
         chrome_options.add_argument("--no-sandbox")
@@ -87,6 +108,80 @@ class LinkedInSeleniumPoster:
             logger.error(f"Failed to setup Chrome WebDriver: {e}")
             raise
 
+    def check_if_logged_in(self) -> bool:
+        """
+        Check if already logged in by navigating to LinkedIn and looking for login indicators.
+
+        Returns:
+            bool: True if already logged in, False otherwise
+        """
+        if not self.driver:
+            self.setup_driver()
+
+        if not self.driver:
+            logger.error("Driver not initialized")
+            return False
+
+        try:
+            logger.info("Checking if already logged in...")
+            self.driver.get("https://www.linkedin.com/feed/")
+            time.sleep(3)
+
+            # Check if we're redirected to login page
+            if "login" in self.driver.current_url:
+                logger.info("Not logged in - redirected to login page")
+                return False
+
+            # Check for login indicators
+            try:
+                # Look for elements that indicate we're logged in
+                feed_indicators = [
+                    "div[data-control-name='feed_identity_welcome_message']",
+                    ".feed-identity-module",
+                    ".feed-identity-welcome-message",
+                    "div[data-test-id='feed-identity-module']",
+                ]
+
+                for selector in feed_indicators:
+                    try:
+                        element = self.driver.find_element(By.CSS_SELECTOR, selector)
+                        if element.is_displayed():
+                            logger.info(
+                                "Already logged in - found feed identity module"
+                            )
+                            self.is_logged_in = True
+                            return True
+                    except NoSuchElementException:
+                        continue
+
+                # Also check for the "Start a post" button which indicates we're logged in
+                try:
+                    post_button = self.driver.find_element(
+                        By.CSS_SELECTOR, "button[aria-label*='Start a post']"
+                    )
+                    if post_button.is_displayed():
+                        logger.info("Already logged in - found post button")
+                        self.is_logged_in = True
+                        return True
+                except NoSuchElementException:
+                    pass
+
+                # Check if we're on the feed page
+                if "feed" in self.driver.current_url:
+                    logger.info("Already logged in - on feed page")
+                    self.is_logged_in = True
+                    return True
+
+            except Exception as e:
+                logger.warning(f"Error checking login status: {e}")
+
+            logger.info("Not logged in")
+            return False
+
+        except Exception as e:
+            logger.error(f"Error checking login status: {e}")
+            return False
+
     def login(self, email: str, password: str) -> bool:
         """
         Log in to LinkedIn using provided credentials.
@@ -104,6 +199,11 @@ class LinkedInSeleniumPoster:
         if not self.driver:
             logger.error("Failed to setup driver")
             return False
+
+        # First check if already logged in
+        if self.check_if_logged_in():
+            logger.info("Already logged in, skipping login process")
+            return True
 
         try:
             logger.info("Navigating to LinkedIn login page...")
@@ -1147,9 +1247,40 @@ class LinkedInSeleniumPoster:
             logger.error(f"Error clicking schedule confirm button: {e}")
             return False
 
+    def post_linkedin_content(
+        self,
+        text: str,
+        schedule_time: datetime.datetime | None = None,
+        visibility: str = "connections",
+    ) -> bool:
+        """
+        Main wrapper function to post content to LinkedIn with optional scheduling.
+
+        Args:
+            text: The text content to post
+            schedule_time: When to post (if None, posts immediately)
+            visibility: Post visibility - "connections" or "public"
+
+        Returns:
+            bool: True if successful, False otherwise
+        """
+        try:
+            if schedule_time is None:
+                # Post immediately
+                logger.info("Posting content immediately...")
+                return self.post_text(text, visibility)
+            else:
+                # Schedule the post
+                logger.info(f"Scheduling post for {schedule_time}")
+                return self.schedule_post(text, schedule_time, visibility)
+
+        except Exception as e:
+            logger.error(f"Error in post_linkedin_content: {e}")
+            return False
+
 
 def main():
-    """Main function to demonstrate LinkedIn scheduling functionality only."""
+    """Main function to demonstrate LinkedIn automation with the new wrapper function."""
 
     # Check if credentials are set
     email = os.getenv("LINKEDIN_EMAIL")
@@ -1159,31 +1290,56 @@ def main():
         print("Please set LINKEDIN_EMAIL and LINKEDIN_PASSWORD environment variables")
         return
 
-    # Initialize the poster
+    # Initialize the poster with persistent cache
     poster = LinkedInSeleniumPoster(headless=False)
 
     try:
-        # Login to LinkedIn
+        # Login to LinkedIn (will use cached session if available)
         if poster.login(email, password):
             print("✅ Successfully logged in to LinkedIn")
+            print("💾 Browser cache and cookies are being saved for future sessions")
 
-            # Example: Schedule a post for tomorrow
+            # Example 1: Post immediately
+            immediate_text = f"This is an immediate post from the LinkedIn wrapper! Posted at {datetime.datetime.now().strftime('%Y-%m-%d %H:%M')} #LinkedInAutomation #WrapperDemo"
+
+            print("\n📝 Example 1: Posting immediately")
+            print(f"Text: '{immediate_text}'")
+
+            if poster.post_linkedin_content(immediate_text, visibility="connections"):
+                print("✅ Successfully posted immediately")
+            else:
+                print("❌ Failed to post immediately")
+
+            # Example 2: Schedule a post for tomorrow
             tomorrow = datetime.datetime.now() + datetime.timedelta(days=1)
             tomorrow = tomorrow.replace(
                 hour=10, minute=0, second=0, microsecond=0
             )  # 10:00 AM tomorrow
 
-            scheduled_text = f"This is a scheduled post from my LinkedIn Selenium automation! Scheduled for {tomorrow.strftime('%Y-%m-%d %H:%M')} #LinkedInAutomation #ScheduledPost"
+            scheduled_text = f"This is a scheduled post from the LinkedIn wrapper! Scheduled for {tomorrow.strftime('%Y-%m-%d %H:%M')} #LinkedInAutomation #ScheduledPost"
 
-            print(f"\nAttempting to schedule post: '{scheduled_text}'")
-            print(f"Scheduling for: {tomorrow.strftime('%Y-%m-%d %I:%M %p')}")
+            print("\n📅 Example 2: Scheduling post")
+            print(f"Text: '{scheduled_text}'")
+            print(f"Schedule for: {tomorrow.strftime('%Y-%m-%d %I:%M %p')}")
 
-            if poster.schedule_post(scheduled_text, tomorrow, visibility="connections"):
+            if poster.post_linkedin_content(
+                scheduled_text, schedule_time=tomorrow, visibility="connections"
+            ):
                 print("✅ Successfully scheduled post")
                 print("Please check your LinkedIn scheduled posts to verify.")
             else:
                 print("❌ Failed to schedule post")
-                print("The script may have encountered an issue during scheduling.")
+
+            # Example 3: Post with public visibility
+            public_text = f"This is a public post from the LinkedIn wrapper! Posted at {datetime.datetime.now().strftime('%Y-%m-%d %H:%M')} #LinkedInAutomation #PublicPost"
+
+            print("\n🌍 Example 3: Posting with public visibility")
+            print(f"Text: '{public_text}'")
+
+            if poster.post_linkedin_content(public_text, visibility="public"):
+                print("✅ Successfully posted with public visibility")
+            else:
+                print("❌ Failed to post with public visibility")
 
         else:
             print("❌ Failed to login to LinkedIn")
@@ -1193,6 +1349,10 @@ def main():
 
     finally:
         poster.close()
+        print("\n💡 Tip: Run this script again and it should skip the login process!")
+        print(
+            "💡 The wrapper function handles both immediate posting and scheduling automatically!"
+        )
 
 
 if __name__ == "__main__":

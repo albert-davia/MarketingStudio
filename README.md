@@ -52,7 +52,11 @@ A comprehensive content marketing agent that can write and post content to Linke
 
 2. The agent will automatically use these credentials to post content.
 
-3. **Scheduling Posts**: You can schedule posts by providing a `schedule_time` parameter in ISO format:
+3. **Browser Cache Persistence**: The LinkedIn automation now saves browser cache and cookies, so you don't need to login every time:
+   - Browser data is stored in `linkedin_browser_data/` directory (same location as the script)
+   - Subsequent runs will skip the login process if the session is still valid
+
+4. **Scheduling Posts**: You can schedule posts by providing a `schedule_time` parameter in ISO format:
    - Format: `YYYY-MM-DDTHH:MM:SS` (e.g., `2024-01-15T10:30:00`)
    - Timezone: Use your local timezone or UTC
    - Example: `2024-01-15T10:30:00+00:00` for UTC
@@ -126,6 +130,18 @@ Run the test script to verify everything works:
 
 ```bash
 python test_agent.py
+```
+
+### Cache Persistence Demo
+
+Test the browser cache functionality:
+
+```bash
+# Run the cache demo (will login first time)
+python linkedin_cache_example.py
+
+# Run again to see cache in action (should skip login)
+python linkedin_cache_example.py
 ```
 
 ## Tools Available

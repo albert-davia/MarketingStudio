@@ -263,10 +263,13 @@ def post_to_linkedin(
                             }
                         )
 
-                # Post the content (scheduled or immediate)
-                if schedule_datetime:
-                    success = poster.schedule_post(text, schedule_datetime, visibility)
-                    if success:
+                # Use the new wrapper function to post content
+                success = poster.post_linkedin_content(
+                    text=text, schedule_time=schedule_datetime, visibility=visibility
+                )
+
+                if success:
+                    if schedule_datetime:
                         result = f"Successfully scheduled LinkedIn post for {schedule_datetime.strftime('%Y-%m-%d %H:%M')} with {visibility} visibility"
                         # Save the scheduled post to state with original title and scheduled date
                         posted_linkedin_post = LinkedinPost(
@@ -287,10 +290,6 @@ def post_to_linkedin(
                             }
                         )
                     else:
-                        result = "Failed to schedule LinkedIn post"
-                else:
-                    success = poster.post_text(text, visibility)
-                    if success:
                         result = f"Successfully posted to LinkedIn with {visibility} visibility"
                         # Save the posted content to state with original title and current date
                         current_time = datetime.datetime.now()
@@ -300,19 +299,20 @@ def post_to_linkedin(
                             posted=True,
                             post_date=current_time.isoformat(),
                         )
-                        return Command(
-                            update={
-                                "new_linkedin_posts": [posted_linkedin_post],
-                                "messages": [
-                                    ToolMessage(
-                                        f"LinkedIn post result: {result}",
-                                        tool_call_id=tool_call_id,
-                                    )
-                                ],
-                            }
-                        )
-                    else:
-                        result = "Failed to post to LinkedIn"
+
+                    return Command(
+                        update={
+                            "new_linkedin_posts": [posted_linkedin_post],
+                            "messages": [
+                                ToolMessage(
+                                    f"LinkedIn post result: {result}",
+                                    tool_call_id=tool_call_id,
+                                )
+                            ],
+                        }
+                    )
+                else:
+                    result = "Failed to post to LinkedIn"
             else:
                 result = "Failed to login to LinkedIn"
 
