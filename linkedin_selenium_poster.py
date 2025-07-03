@@ -1305,11 +1305,6 @@ def main():
             print("\n📝 Example 1: Posting immediately")
             print(f"Text: '{immediate_text}'")
 
-            if poster.post_linkedin_content(immediate_text, visibility="connections"):
-                print("✅ Successfully posted immediately")
-            else:
-                print("❌ Failed to post immediately")
-
             # Example 2: Schedule a post for tomorrow
             tomorrow = datetime.datetime.now() + datetime.timedelta(days=1)
             tomorrow = tomorrow.replace(
@@ -1329,17 +1324,6 @@ def main():
                 print("Please check your LinkedIn scheduled posts to verify.")
             else:
                 print("❌ Failed to schedule post")
-
-            # Example 3: Post with public visibility
-            public_text = f"This is a public post from the LinkedIn wrapper! Posted at {datetime.datetime.now().strftime('%Y-%m-%d %H:%M')} #LinkedInAutomation #PublicPost"
-
-            print("\n🌍 Example 3: Posting with public visibility")
-            print(f"Text: '{public_text}'")
-
-            if poster.post_linkedin_content(public_text, visibility="public"):
-                print("✅ Successfully posted with public visibility")
-            else:
-                print("❌ Failed to post with public visibility")
 
         else:
             print("❌ Failed to login to LinkedIn")
