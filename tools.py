@@ -4,13 +4,10 @@ import datetime
 ## Davia setup
 ## supabase setup
 import os
-from typing import Annotated, Literal
+from typing import Literal
 
 from dotenv import load_dotenv
-from langchain_core.messages import ToolMessage
-from langchain_core.tools import InjectedToolCallId
 from langchain_openai import ChatOpenAI
-from langgraph.types import Command
 from supabase import Client, create_client
 
 from classes import (
@@ -201,14 +198,22 @@ def write_youtube_description(
 
 
 def post_to_linkedin(
-    linkedin_post: LinkedinPost,
-    tool_call_id: Annotated[str, InjectedToolCallId],
+    linkedin_post_id: int,
     visibility: str = "connections",
-    schedule_time: str | None = None,
-) -> Command:
+) -> str:
     """Post content to LinkedIn using Selenium automation. Can schedule posts for later."""
 
-    text = linkedin_post.post
+    linkedin_post_supabase = (
+        supabase.table("linkedin_posts")
+        .select("*")
+        .eq("id", linkedin_post_id)
+        .execute()
+    )
+    linkedin_post = LinkedinPost(
+        title=linkedin_post_supabase.data[0]["title"],
+        post=linkedin_post_supabase.data[0]["post"],
+        post_date=str(linkedin_post_supabase.data[0]["post_date"]),
+    )
 
     try:
         # Get LinkedIn credentials from environment
@@ -216,16 +221,7 @@ def post_to_linkedin(
         password = os.getenv("LINKEDIN_PASSWORD")
 
         if not email or not password:
-            return Command(
-                update={
-                    "messages": [
-                        ToolMessage(
-                            "LinkedIn credentials not found. Please set LINKEDIN_EMAIL and LINKEDIN_PASSWORD environment variables.",
-                            tool_call_id=tool_call_id,
-                        )
-                    ],
-                }
-            )
+            return "LinkedIn credentials not found. Please set LINKEDIN_EMAIL and LINKEDIN_PASSWORD environment variables."
 
         # Initialize LinkedIn poster
         poster = LinkedInSeleniumPoster(headless=False)
@@ -235,71 +231,33 @@ def post_to_linkedin(
             if poster.login(email, password):
                 # Parse schedule time if provided
                 schedule_datetime = None
-                if schedule_time:
+                if linkedin_post.post_date:
                     try:
                         schedule_datetime = datetime.datetime.fromisoformat(
-                            schedule_time.replace("Z", "+00:00")
+                            linkedin_post.post_date.replace("Z", "+00:00")
                         )
                     except ValueError:
-                        return Command(
-                            update={
-                                "messages": [
-                                    ToolMessage(
-                                        f"Invalid date format for schedule_time: {schedule_time}. Use ISO format (YYYY-MM-DDTHH:MM:SS)",
-                                        tool_call_id=tool_call_id,
-                                    )
-                                ],
-                            }
-                        )
+                        return "Invalid date format for schedule_time"
 
                 # Use the new wrapper function to post content
                 success = poster.post_linkedin_content(
-                    text=text, schedule_time=schedule_datetime, visibility=visibility
+                    text=linkedin_post.post,
+                    schedule_time=schedule_datetime,
+                    visibility=visibility,
                 )
 
                 if success:
                     if schedule_datetime:
                         result = f"Successfully scheduled LinkedIn post for {schedule_datetime.strftime('%Y-%m-%d %H:%M')} with {visibility} visibility"
-                        # Save the scheduled post to state with original title and scheduled date
-                        posted_linkedin_post = LinkedinPost(
-                            title=linkedin_post.title,
-                            post=linkedin_post.post,
-                            status="pending",
-                            post_date=schedule_datetime.isoformat(),
-                        )
-                        return Command(
-                            update={
-                                "new_linkedin_posts": [posted_linkedin_post],
-                                "messages": [
-                                    ToolMessage(
-                                        f"LinkedIn post result: {result}",
-                                        tool_call_id=tool_call_id,
-                                    )
-                                ],
-                            }
-                        )
                     else:
                         result = f"Successfully posted to LinkedIn with {visibility} visibility"
-                        # Save the posted content to state with original title and current date
-                        current_time = datetime.datetime.now()
-                        posted_linkedin_post = LinkedinPost(
-                            title=linkedin_post.title,
-                            post=linkedin_post.post,
-                            status="pending",
-                            post_date=current_time.isoformat(),
-                        )
 
-                    return Command(
-                        update={
-                            "new_linkedin_posts": [posted_linkedin_post],
-                            "messages": [
-                                ToolMessage(
-                                    f"LinkedIn post result: {result}",
-                                    tool_call_id=tool_call_id,
-                                )
-                            ],
-                        }
-                    )
+                    # change the status of the post in supabase to posted
+                    supabase.table("linkedin_posts").update({"status": "posted"}).eq(
+                        "id", linkedin_post_id
+                    ).execute()
+
+                    return "LinkedIn post result: " + result
                 else:
                     result = "Failed to post to LinkedIn"
             else:
@@ -308,28 +266,10 @@ def post_to_linkedin(
         finally:
             poster.close()
 
-        return Command(
-            update={
-                "messages": [
-                    ToolMessage(
-                        f"LinkedIn post result: {result}",
-                        tool_call_id=tool_call_id,
-                    )
-                ],
-            }
-        )
+        return "LinkedIn post result: " + result
 
     except Exception as e:
-        return Command(
-            update={
-                "messages": [
-                    ToolMessage(
-                        f"Error posting to LinkedIn: {str(e)}",
-                        tool_call_id=tool_call_id,
-                    )
-                ],
-            }
-        )
+        return "Error posting to LinkedIn: " + str(e)
 
 
 def upload_to_youtube(
