@@ -35,6 +35,7 @@ def write_linkedin_post(
     content_type: str,
     goal: str,
     post_date_str: str,
+    description: str,
 ) -> str:
     """Write a LinkedIn post about a given topic"""
 
@@ -64,6 +65,7 @@ def write_linkedin_post(
             content_type=content_type,
             goal=goal,
             past_posts=linkedin_posts_supabase,
+            description=description,
         )
     )
     post.status = "pending"  # type: ignore
@@ -94,6 +96,7 @@ def write_twitter_post(
     content_type: str,
     goal: str,
     post_date_str: str,
+    description: str,
 ) -> str:
     """Write a Twitter post about a given topic"""
 
@@ -119,6 +122,7 @@ def write_twitter_post(
             content_type=content_type,
             goal=goal,
             past_posts=twitter_posts_supabase,
+            description=description,
         )
     )
     post.posted = False  # type: ignore

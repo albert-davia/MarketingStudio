@@ -16,6 +16,11 @@ Instructions:
 5. End with a strong CTA
 Write like a human. No fluff. No cringe. Make it hit.
 
+This description is to give you more context:
+
+{description}
+
+
 Use the past posts as a reference to write the new post.
 
 Past posts:
