@@ -381,3 +381,113 @@ if __name__ == "__main__":
             post_date_str="2025-01-01T00:00:00Z",
         )
     )
+
+
+def visualise_week_ahead():
+    # get all posts from supabase for the next 8 days
+
+    # Calculate date range for next 8 days
+    today = datetime.datetime.now().date()
+    end_date = today + datetime.timedelta(days=7)
+
+    linkedin_posts_supabase = (
+        supabase.table("linkedin_posts")
+        .select("*")
+        .gte("post_date", today.isoformat())
+        .lt("post_date", end_date.isoformat())
+        .execute()
+        .data
+    )
+    twitter_posts_supabase = (
+        supabase.table("twitter_posts")
+        .select("*")
+        .gte("post_date", today.isoformat())
+        .lt("post_date", end_date.isoformat())
+        .execute()
+        .data
+    )
+    youtube_videos_supabase = (
+        supabase.table("youtube_descriptions")
+        .select("*")
+        .gte("post_date", today.isoformat())
+        .lt("post_date", end_date.isoformat())
+        .execute()
+        .data
+    )
+
+    # Create a structured visualization with better formatting
+    weekdays = [
+        "Monday",
+        "Tuesday",
+        "Wednesday",
+        "Thursday",
+        "Friday",
+        "Saturday",
+        "Sunday",
+    ]
+
+    print("=" * 80)
+    print("📅 WEEK AHEAD CONTENT SCHEDULE")
+    print("=" * 80)
+
+    for day in range(7):
+        current_date = today + datetime.timedelta(days=day)
+        weekday_name = weekdays[current_date.weekday()]
+
+        print(f"\n📆 {weekday_name} ({current_date.strftime('%Y-%m-%d')})")
+        print("-" * 50)
+
+        # LinkedIn posts
+        linkedin_count = 0
+        for post in linkedin_posts_supabase:
+            if (
+                post["post_date"]
+                and datetime.datetime.fromisoformat(post["post_date"]).weekday() == day
+            ):
+                if linkedin_count == 0:
+                    print("🔗 LinkedIn:")
+                linkedin_count += 1
+                status_emoji = "✅" if post.get("status") == "posted" else "⏳"
+                print(f"   {status_emoji} {post['title']}")
+
+        if linkedin_count == 0:
+            print("🔗 LinkedIn: No posts scheduled")
+
+        # Twitter posts
+        twitter_count = 0
+        for post in twitter_posts_supabase:
+            if (
+                post["post_date"]
+                and datetime.datetime.fromisoformat(post["post_date"]).weekday() == day
+            ):
+                if twitter_count == 0:
+                    print("🐦 Twitter:")
+                twitter_count += 1
+                status_emoji = "✅" if post.get("posted") else "⏳"
+                print(f"   {status_emoji} {post.get('title', 'Untitled Tweet')}")
+
+        if twitter_count == 0:
+            print("🐦 Twitter: No posts scheduled")
+
+        # YouTube videos
+        youtube_count = 0
+        for post in youtube_videos_supabase:
+            if (
+                post["post_date"]
+                and datetime.datetime.fromisoformat(post["post_date"]).weekday() == day
+            ):
+                if youtube_count == 0:
+                    print("📺 YouTube:")
+                youtube_count += 1
+                status_emoji = "✅" if post.get("posted") else "⏳"
+                print(f"   {status_emoji} {post['title']}")
+
+        if youtube_count == 0:
+            print("📺 YouTube: No videos scheduled")
+
+    print("\n" + "=" * 80)
+    print("📊 SUMMARY:")
+    print(f"   LinkedIn posts: {len(linkedin_posts_supabase)}")
+    print(f"   Twitter posts: {len(twitter_posts_supabase)}")
+    print(f"   YouTube videos: {len(youtube_videos_supabase)}")
+    print("=" * 80)
