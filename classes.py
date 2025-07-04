@@ -18,6 +18,7 @@ class LinkedinPost(BaseModel):
 class TwitterPost(BaseModel):
     post: str
     posted: bool = False
+    post_date: str | None = None
 
 
 class YouTubeDescription(BaseModel):
@@ -25,6 +26,7 @@ class YouTubeDescription(BaseModel):
     description: str
     video_url_drive: str
     posted: bool = False
+    post_date: str | None = None
 
 
 class State(MessagesState):
