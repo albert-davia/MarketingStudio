@@ -5,18 +5,7 @@ from typing import Any, Literal
 from langchain_core.messages import AnyMessage
 from pydantic import BaseModel
 
-from agent import DeleteTask
-
 # Import LinkedIn and YouTube functionality
-
-
-def custom_reducer(list1: list[Any], list2: list[Any]) -> list[Any]:
-    for item2 in list2:
-        if isinstance(item2, DeleteTask):
-            list1 = [item for item in list1 if item.id != item2.id]
-        else:
-            list1.append(item2)
-    return list1
 
 
 def custom_tools_condition(

@@ -1,16 +1,15 @@
 import datetime
-import operator
 
 ## Davia setup
 ## supabase setup
 import os
-from typing import Annotated, Literal
 
 from langchain_openai import ChatOpenAI
-from langgraph.graph import MessagesState, StateGraph
+from langgraph.graph import StateGraph
 from langgraph.prebuilt import ToolNode
-from pydantic import BaseModel
 from supabase import Client, create_client
+
+from classes import LinkedinPost, State, TwitterPost, YouTubeDescription
 
 # Import LinkedIn and YouTube functionality
 from promts import agent_prompt
@@ -22,7 +21,7 @@ from tools import (
     write_twitter_post,
     write_youtube_description,
 )
-from utils import custom_reducer, custom_tools_condition
+from utils import custom_tools_condition
 
 supabase: Client = create_client(os.environ["SUPABASE_URL"], os.environ["SUPABASE_KEY"])
 
@@ -34,50 +33,6 @@ model = ChatOpenAI(model="gpt-4o-mini", temperature=0)
 goals = ["engagement", "clicks", "conversions", "leads"]
 
 content_types = ["viral thread", "sales page", "cold email", "newsletter"]
-
-
-class LinkedinPost(BaseModel):
-    title: str
-    post: str
-    posted: bool = False
-    post_date: str | None = None
-
-
-class TwitterPost(BaseModel):
-    post: str
-    posted: bool = False
-
-
-class YouTubeDescription(BaseModel):
-    title: str
-    description: str
-    video_url_drive: str
-    posted: bool = False
-
-
-class DeleteTask(BaseModel):
-    id: int
-
-
-class Task(BaseModel):
-    id: int | None = None
-    created_at: datetime.datetime | None = None
-    time: datetime.datetime | None = None
-    description: str | None = None
-    status: Literal["pending", "posted"] = "pending"
-    content_type: Literal["youtube", "linkedin", "twitter"] = "youtube"
-
-
-class State(MessagesState):
-    linkedin_posts: Annotated[list[LinkedinPost], operator.add]
-    new_linkedin_posts: Annotated[list[LinkedinPost], operator.add]
-    twitter_posts: Annotated[list[TwitterPost], operator.add]
-    new_twitter_posts: Annotated[list[TwitterPost], operator.add]
-    youtube_descriptions: Annotated[list[YouTubeDescription], operator.add]
-    new_youtube_descriptions: Annotated[list[YouTubeDescription], operator.add]
-    tasks: Annotated[list[Task], custom_reducer]
-    html_week_ahead: str
-
 
 # Create tools list with conditional inclusion based on availability
 tools = [
@@ -121,7 +76,7 @@ def load_state(state: State):
                 LinkedinPost(
                     title=post["title"],
                     post=post["post"],
-                    posted=True,  # All existing data is considered posted
+                    status=post["status"],  # All existing data is considered posted
                     post_date=post.get(
                         "post_date"
                     ),  # Load existing post_date if available
@@ -164,7 +119,9 @@ def load_state(state: State):
 def save_state(state: State):
     if state.get("new_linkedin_posts"):
         # Only save LinkedIn posts that were actually posted
-        posted_linkedin_posts = [p for p in state["new_linkedin_posts"] if p.posted]
+        posted_linkedin_posts = [
+            p for p in state["new_linkedin_posts"] if p.status == "posted"
+        ]
         if posted_linkedin_posts:
             # Create data with post_date, but handle potential column missing
             data = []
