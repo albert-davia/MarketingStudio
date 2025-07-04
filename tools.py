@@ -1,3 +1,4 @@
+# Import LinkedIn and YouTube functionality
 import datetime
 
 ## Davia setup
@@ -19,16 +20,15 @@ from classes import (
     TwitterPost,
     YouTubeDescription,
 )
+from linkedin_selenium_poster import LinkedInSeleniumPoster
+from promts import post_generation_prompt, youtube_description_prompt
+from twitter_selenium_poster import post_tweet
+from upload_youtube import upload_local_video
 
 model = ChatOpenAI(model="gpt-4o-mini", temperature=0)
 
 supabase: Client = create_client(os.environ["SUPABASE_URL"], os.environ["SUPABASE_KEY"])
 
-# Import LinkedIn and YouTube functionality
-from linkedin_selenium_poster import LinkedInSeleniumPoster
-from promts import post_generation_prompt, youtube_description_prompt
-from twitter_selenium_poster import post_tweet
-from upload_youtube import upload_local_video
 
 load_dotenv()
 
