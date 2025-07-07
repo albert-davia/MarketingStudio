@@ -1,5 +1,6 @@
 # Import LinkedIn and YouTube functionality
 import datetime
+import json
 
 ## Davia setup
 ## supabase setup
@@ -25,6 +26,9 @@ model = ChatOpenAI(model="gpt-4o-mini", temperature=0)
 
 supabase: Client = create_client(os.environ["SUPABASE_URL"], os.environ["SUPABASE_KEY"])
 
+from davia import Davia
+
+app = Davia("MarketingStudio")
 
 load_dotenv()
 
@@ -203,6 +207,7 @@ def write_youtube_description(
     return f"YouTube description written: {description.title} with id : {description_supabase.data[0]['id']}"  # type: ignore
 
 
+@app.task
 def post_to_linkedin(
     linkedin_post_id: int,
     visibility: str = "connections",
@@ -278,6 +283,7 @@ def post_to_linkedin(
         return "Error posting to LinkedIn: " + str(e)
 
 
+@app.task
 def upload_to_youtube(
     video_id: int,
     channel: Literal["albertthebuilder", "davia"],
@@ -332,6 +338,7 @@ def upload_to_youtube(
         return "Error uploading to YouTube: " + str(e)
 
 
+@app.task
 def post_to_twitter(
     twitter_post_id: int,
 ) -> str:
@@ -486,19 +493,8 @@ def visualise_week_ahead():
     print("=" * 80)
 
 
-if __name__ == "__main__":
-    write_twitter_post(
-        topic="Just released a new video on youtube",
-        target_audience="builders who dont want to code",
-        platform="twitter",
-        content_type="twitter post",
-        goal="get clicks on the video",
-        post_date_str="2025-07-05T10:00:00Z",
-        description="""I want you to rewrite the last twitter post, being shorter say that we tried to replicate the product of a startup in 20 minutes using davia""",
-    )
-
-
-def get_all_posts_for_next_week():
+@app.task
+def get_all_posts_for_next_week() -> list[str]:
     """Get all the posts for the next week"""
     today = datetime.datetime.now().date()
     end_date = today + datetime.timedelta(days=7)
@@ -528,9 +524,15 @@ def get_all_posts_for_next_week():
         .data
     )
 
-    return linkedin_posts_supabase, twitter_posts_supabase, youtube_videos_supabase
+    return [
+        json.dumps(post)
+        for post in linkedin_posts_supabase
+        + twitter_posts_supabase
+        + youtube_videos_supabase
+    ]
 
 
+@app.task
 def schedule_for_next_week(user_prompt: str):
     """Schedule the content for the next week"""
     response = model.with_structured_output(Schedule).invoke(
@@ -598,14 +600,4 @@ def schedule_for_next_week(user_prompt: str):
 
 
 if __name__ == "__main__":
-    fake_update = """
-        This week we:
-
-        - Shipped a new integration that lets users authenticate with OAuth providers (Google, GitHub, etc.) inside Davia apps
-        - Built a new demo showing how to use LangGraph with Davia to create a personal productivity dashboard (it tracks tasks, goals, calories)
-        - Started experimenting with voice input + streaming responses in AI tools
-        - Had great internal discussions on making Davia better for AI founders who want to go from script → product → monetization
-        - Got a small Twitter thread pickup when we showed a GPT-powered roadmap planner built with Davia + Supabase
-        - Preparing a new docs section focused on real-time app use cases
-        """
-    schedule_for_next_week(fake_update)
+    app.run()
