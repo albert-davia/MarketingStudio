@@ -1,6 +1,5 @@
 # Import LinkedIn and YouTube functionality
 import datetime
-import json
 
 ## Davia setup
 ## supabase setup
@@ -493,8 +492,10 @@ def visualise_week_ahead():
 
 
 @app.task
-def get_all_posts_for_next_week() -> str:
-    """Get all the posts for the next week"""
+def get_all_posts_for_next_week() -> tuple[
+    list[LinkedinPost], list[TwitterPost], list[YouTubeDescription]
+]:
+    """Get all the posts for the next week and return them as a tuple"""
     today = datetime.datetime.now().date()
     end_date = today + datetime.timedelta(days=7)
 
@@ -523,11 +524,14 @@ def get_all_posts_for_next_week() -> str:
         .data
     )
 
-    return json.dumps(
-        linkedin_posts_supabase + twitter_posts_supabase + youtube_videos_supabase
+    return (
+        [LinkedinPost(**post) for post in linkedin_posts_supabase],
+        [TwitterPost(**post) for post in twitter_posts_supabase],
+        [YouTubeDescription(**post) for post in youtube_videos_supabase],
     )
 
 
+@app.task
 def get_all_posts():
     """Get all the posts"""
     linkedin_posts_supabase = (
@@ -538,8 +542,10 @@ def get_all_posts():
         supabase.table("youtube_descriptions").select("*").execute().data
     )
 
-    return json.dumps(
-        linkedin_posts_supabase + twitter_posts_supabase + youtube_videos_supabase
+    return (
+        [LinkedinPost(**post) for post in linkedin_posts_supabase],
+        [TwitterPost(**post) for post in twitter_posts_supabase],
+        [YouTubeDescription(**post) for post in youtube_videos_supabase],
     )
 
 
@@ -608,6 +614,17 @@ def schedule_for_next_week(user_prompt: str):
         )
 
     return "Content scheduled for the next week"
+
+
+@app.task
+def delete_post(
+    post_id: int,
+    table: Literal["linkedin_posts", "twitter_posts", "youtube_descriptions"],
+) -> str:
+    """Delete a post from the database"""
+    supabase.table(table).delete().eq("id", post_id).execute()
+
+    return "Post deleted"
 
 
 if __name__ == "__main__":
