@@ -595,3 +595,17 @@ def schedule_for_next_week(user_prompt: str):
         )
 
     return "Content scheduled for the next week"
+
+
+if __name__ == "__main__":
+    fake_update = """
+        This week we:
+
+        - Shipped a new integration that lets users authenticate with OAuth providers (Google, GitHub, etc.) inside Davia apps
+        - Built a new demo showing how to use LangGraph with Davia to create a personal productivity dashboard (it tracks tasks, goals, calories)
+        - Started experimenting with voice input + streaming responses in AI tools
+        - Had great internal discussions on making Davia better for AI founders who want to go from script → product → monetization
+        - Got a small Twitter thread pickup when we showed a GPT-powered roadmap planner built with Davia + Supabase
+        - Preparing a new docs section focused on real-time app use cases
+        """
+    schedule_for_next_week(fake_update)

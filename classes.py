@@ -26,7 +26,7 @@ class YouTubeDescription(BaseModel):
     post_date: str | None = None
 
 
-class Schedule:
+class Schedule(BaseModel):
     topic_for_monday: str
     description_for_monday: str
     video_description_for_monday: str
