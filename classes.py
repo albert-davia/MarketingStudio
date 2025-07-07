@@ -24,3 +24,9 @@ class YouTubeDescription(BaseModel):
     video_url_drive: str
     status: Literal["pending", "posted"] = "pending"
     post_date: str | None = None
+
+
+class Schedule:
+    topic_for_monday: str
+    topic_for_wednesday: str
+    topic_for_friday: str

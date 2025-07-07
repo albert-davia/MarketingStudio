@@ -12,6 +12,7 @@ from supabase import Client, create_client
 
 from classes import (
     LinkedinPost,
+    Schedule,
     TwitterPost,
     YouTubeDescription,
 )
@@ -495,3 +496,42 @@ if __name__ == "__main__":
         post_date_str="2025-07-05T10:00:00Z",
         description="""I want you to rewrite the last twitter post, being shorter say that we tried to replicate the product of a startup in 20 minutes using davia""",
     )
+
+
+def get_all_posts_for_next_week():
+    """Get all the posts for the next week"""
+    today = datetime.datetime.now().date()
+    end_date = today + datetime.timedelta(days=7)
+
+    linkedin_posts_supabase = (
+        supabase.table("linkedin_posts")
+        .select("*")
+        .gte("post_date", today.isoformat())
+        .lt("post_date", end_date.isoformat())
+        .execute()
+        .data
+    )
+    twitter_posts_supabase = (
+        supabase.table("twitter_posts")
+        .select("*")
+        .gte("post_date", today.isoformat())
+        .lt("post_date", end_date.isoformat())
+        .execute()
+        .data
+    )
+    youtube_videos_supabase = (
+        supabase.table("youtube_descriptions")
+        .select("*")
+        .gte("post_date", today.isoformat())
+        .lt("post_date", end_date.isoformat())
+        .execute()
+        .data
+    )
+
+    return linkedin_posts_supabase, twitter_posts_supabase, youtube_videos_supabase
+
+
+def schedule_for_next_week(user_prompt: str):
+    """Schedule the content for the next week"""
+    model.with_structured_output(Schedule).invoke(user_prompt)
+    return "Content scheduled for the next week"
