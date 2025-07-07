@@ -528,6 +528,21 @@ def get_all_posts_for_next_week() -> str:
     )
 
 
+def get_all_posts():
+    """Get all the posts"""
+    linkedin_posts_supabase = (
+        supabase.table("linkedin_posts").select("*").execute().data
+    )
+    twitter_posts_supabase = supabase.table("twitter_posts").select("*").execute().data
+    youtube_videos_supabase = (
+        supabase.table("youtube_descriptions").select("*").execute().data
+    )
+
+    return json.dumps(
+        linkedin_posts_supabase + twitter_posts_supabase + youtube_videos_supabase
+    )
+
+
 @app.task
 def schedule_for_next_week(user_prompt: str):
     """Schedule the content for the next week"""
