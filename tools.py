@@ -7,6 +7,7 @@ import json
 import os
 from typing import Literal
 
+from davia import Davia
 from dotenv import load_dotenv
 from langchain_openai import ChatOpenAI
 from supabase import Client, create_client
@@ -22,15 +23,13 @@ from promts import post_generation_prompt, schedule_prompt, youtube_description_
 from twitter_selenium_poster import post_tweet
 from upload_youtube import upload_local_video
 
+load_dotenv()
+
 model = ChatOpenAI(model="gpt-4o-mini", temperature=0)
 
 supabase: Client = create_client(os.environ["SUPABASE_URL"], os.environ["SUPABASE_KEY"])
 
-from davia import Davia
-
 app = Davia("MarketingStudio")
-
-load_dotenv()
 
 
 def write_linkedin_post(
@@ -494,7 +493,7 @@ def visualise_week_ahead():
 
 
 @app.task
-def get_all_posts_for_next_week() -> list[str]:
+def get_all_posts_for_next_week() -> str:
     """Get all the posts for the next week"""
     today = datetime.datetime.now().date()
     end_date = today + datetime.timedelta(days=7)
@@ -524,12 +523,9 @@ def get_all_posts_for_next_week() -> list[str]:
         .data
     )
 
-    return [
-        json.dumps(post)
-        for post in linkedin_posts_supabase
-        + twitter_posts_supabase
-        + youtube_videos_supabase
-    ]
+    return json.dumps(
+        linkedin_posts_supabase + twitter_posts_supabase + youtube_videos_supabase
+    )
 
 
 @app.task
