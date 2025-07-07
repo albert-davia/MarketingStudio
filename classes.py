@@ -28,5 +28,11 @@ class YouTubeDescription(BaseModel):
 
 class Schedule:
     topic_for_monday: str
+    description_for_monday: str
+    video_description_for_monday: str
     topic_for_wednesday: str
+    description_for_wednesday: str
+    video_description_for_wednesday: str
     topic_for_friday: str
+    description_for_friday: str
+    video_description_for_friday: str

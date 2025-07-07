@@ -533,5 +533,63 @@ def get_all_posts_for_next_week():
 
 def schedule_for_next_week(user_prompt: str):
     """Schedule the content for the next week"""
-    model.with_structured_output(Schedule).invoke(user_prompt)
+    response = model.with_structured_output(Schedule).invoke(user_prompt)
+
+    today = datetime.datetime.now().date()
+    day_of_week = today.weekday()
+    monday = today + datetime.timedelta(days=abs(0 - day_of_week))
+    wednesday = today + datetime.timedelta(days=abs(2 - day_of_week))
+    friday = today + datetime.timedelta(days=abs(4 - day_of_week))
+
+    topics = [
+        (
+            response.topic_for_monday,  # type: ignore
+            response.description_for_monday,  # type: ignore
+            response.video_description_for_monday,  # type: ignore
+            monday,
+        ),
+        (
+            response.topic_for_wednesday,  # type: ignore
+            response.description_for_wednesday,  # type: ignore
+            response.video_description_for_wednesday,  # type: ignore
+            wednesday,
+        ),
+        (
+            response.topic_for_friday,  # type: ignore
+            response.description_for_friday,  # type: ignore
+            response.video_description_for_friday,  # type: ignore
+            friday,
+        ),
+    ]
+
+    for topic, description, video_description, post_date in topics:
+        write_linkedin_post(
+            topic=topic,
+            target_audience="builders who dont want to code",
+            platform="linkedin",
+            content_type="linkedin post",
+            goal="get clicks on the post",
+            post_date_str=post_date.isoformat(),
+            description=description,
+        )
+
+        write_twitter_post(
+            topic=topic,
+            target_audience="builders who dont want to code",
+            platform="twitter",
+            content_type="twitter post",
+            goal="get clicks on the post",
+            post_date_str=post_date.isoformat(),
+            description=description,
+        )
+
+        write_youtube_description(
+            topic=topic,
+            target_audience="builders who dont want to code",
+            video_summary=video_description,
+            content_type="youtube description",
+            goal="Get the most views on youtube",
+            post_date_str=post_date.isoformat(),
+        )
+
     return "Content scheduled for the next week"
