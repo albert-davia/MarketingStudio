@@ -14,7 +14,7 @@ class LinkedinPost(BaseModel):
 
 class TwitterPost(BaseModel):
     post: str
-    posted: bool = False
+    status: Literal["pending", "posted"] = "pending"
     post_date: str | None = None
 
 
@@ -22,5 +22,5 @@ class YouTubeDescription(BaseModel):
     title: str
     description: str
     video_url_drive: str
-    posted: bool = False
+    status: Literal["pending", "posted"] = "pending"
     post_date: str | None = None

@@ -109,7 +109,7 @@ def write_twitter_post(
     twitter_posts_supabase = [
         TwitterPost(
             post=post["post"],
-            posted=post["posted"],
+            status=post["status"],
         )
         for post in twitter_posts_supabase
     ]
@@ -125,7 +125,7 @@ def write_twitter_post(
             description=description,
         )
     )
-    post.posted = False  # type: ignore
+    post.status = "pending"  # type: ignore
 
     post_supabase = (
         supabase.table("twitter_posts")
@@ -134,7 +134,7 @@ def write_twitter_post(
                 "post": post.post,  # type: ignore
                 "created_at": datetime.datetime.now().isoformat(),
                 "post_date": post_date.isoformat(),
-                "posted": False,
+                "status": "pending",
             }
         )
         .execute()
@@ -182,7 +182,7 @@ def write_youtube_description(
             past_descriptions=youtube_descriptions_supabase,
         )
     )
-    description.posted = False  # type: ignore
+    description.status = "pending"  # type: ignore
 
     description_supabase = (
         supabase.table("youtube_descriptions")
@@ -193,6 +193,7 @@ def write_youtube_description(
                 "video_url_drive": description.video_url_drive,  # type: ignore
                 "created_at": datetime.datetime.now().isoformat(),
                 "post_date": post_date.isoformat(),
+                "status": "pending",
             }
         )
         .execute()
@@ -317,7 +318,7 @@ def upload_to_youtube(
         )
 
         # change the status of the video in supabase to posted
-        supabase.table("youtube_videos").update({"status": "posted"}).eq(
+        supabase.table("youtube_descriptions").update({"status": "posted"}).eq(
             "id", video_id
         ).execute()
 
@@ -340,7 +341,7 @@ def post_to_twitter(
     )
     twitter_post = TwitterPost(
         post=twitter_post_supabase.data[0]["post"],
-        posted=twitter_post_supabase.data[0]["posted"],
+        status=twitter_post_supabase.data[0]["status"],
         post_date=str(twitter_post_supabase.data[0]["post_date"]),
     )
 
@@ -364,7 +365,7 @@ def post_to_twitter(
             result = "Successfully posted to Twitter"
 
         # change the status of the post in supabase to posted
-        supabase.table("twitter_posts").update({"posted": True}).eq(
+        supabase.table("twitter_posts").update({"status": "posted"}).eq(
             "id", twitter_post_id
         ).execute()
 
@@ -372,19 +373,6 @@ def post_to_twitter(
 
     except Exception as e:
         return "Error posting to Twitter: " + str(e)
-
-
-if __name__ == "__main__":
-    print(
-        write_youtube_description(
-            topic="test, this is only a test write a verrrryyy short post",
-            target_audience="no one",
-            video_summary="test",
-            content_type="test",
-            goal="test",
-            post_date_str="2025-01-01T00:00:00Z",
-        )
-    )
 
 
 def visualise_week_ahead():
@@ -495,3 +483,15 @@ def visualise_week_ahead():
     print(f"   Twitter posts: {len(twitter_posts_supabase)}")
     print(f"   YouTube videos: {len(youtube_videos_supabase)}")
     print("=" * 80)
+
+
+if __name__ == "__main__":
+    write_twitter_post(
+        topic="Just released a new video on youtube",
+        target_audience="builders who dont want to code",
+        platform="twitter",
+        content_type="twitter post",
+        goal="get clicks on the video",
+        post_date_str="2025-07-05T10:00:00Z",
+        description="""I want you to rewrite the last twitter post, being shorter say that we tried to replicate the product of a startup in 20 minutes using davia""",
+    )
