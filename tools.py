@@ -17,7 +17,7 @@ from classes import (
     YouTubeDescription,
 )
 from linkedin_selenium_poster import LinkedInSeleniumPoster
-from promts import post_generation_prompt, youtube_description_prompt
+from promts import post_generation_prompt, schedule_prompt, youtube_description_prompt
 from twitter_selenium_poster import post_tweet
 from upload_youtube import upload_local_video
 
@@ -533,7 +533,9 @@ def get_all_posts_for_next_week():
 
 def schedule_for_next_week(user_prompt: str):
     """Schedule the content for the next week"""
-    response = model.with_structured_output(Schedule).invoke(user_prompt)
+    response = model.with_structured_output(Schedule).invoke(
+        schedule_prompt.format(user_prompt=user_prompt)
+    )
 
     today = datetime.datetime.now().date()
     day_of_week = today.weekday()
