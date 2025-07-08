@@ -76,6 +76,7 @@ dependencies = [
     "selenium>=4.32.0",
     "webdriver-manager>=4.0.2",
     "matplotlib>=3.8.0",
+    "pyperclip>=1.9.0",
 ]
 requires-python = ">=3.11"
 license = {text = "MIT"}

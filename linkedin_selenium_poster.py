@@ -348,16 +348,23 @@ class LinkedInSeleniumPoster:
             logger.error(f"Error finding post textarea: {e}")
             return None
 
+    def set_textarea_value_js(self, textarea, text):
+        if self.driver is None:
+            logger.error("Driver not initialized")
+            return
+        # Set the text using JavaScript (works for emojis)
+        self.driver.execute_script(
+            "arguments[0].innerText = arguments[1];", textarea, text
+        )
+        # Trigger input event to notify React/LinkedIn
+        self.driver.execute_script(
+            "arguments[0].dispatchEvent(new Event('input', { bubbles: true }));",
+            textarea,
+        )
+
     def post_text(self, text: str, visibility: str = "connections") -> bool:
         """
         Post text content to LinkedIn.
-
-        Args:
-            text: The text content to post
-            visibility: Post visibility - "connections" or "public"
-
-        Returns:
-            bool: True if post successful, False otherwise
         """
         if not self.is_logged_in:
             logger.error("Not logged in. Please login first.")
@@ -379,23 +386,9 @@ class LinkedInSeleniumPoster:
             if not textarea:
                 return False
 
-            # Clear any existing text and enter new text
-            textarea.clear()
-
-            # Handle Unicode characters that might cause ChromeDriver issues
-            try:
-                # Try direct send_keys first
-                textarea.send_keys(text)
-            except Exception as e:
-                if "BMP" in str(e):
-                    # If BMP error, try to clean the text
-                    logger.warning("Unicode characters detected, cleaning text...")
-                    # Remove non-BMP characters (emojis, etc.)
-                    cleaned_text = "".join(char for char in text if ord(char) < 65536)
-                    textarea.send_keys(cleaned_text)
-                    logger.info(f"Posted cleaned text: {cleaned_text}")
-                else:
-                    raise e
+            # Always use JS workaround for emoji support
+            self.set_textarea_value_js(textarea, text)
+            logger.info("Posted text using JS workaround")
 
             # Set visibility if needed
             if visibility.lower() == "public":
@@ -817,14 +810,6 @@ class LinkedInSeleniumPoster:
     ) -> bool:
         """
         Post content with media (image/video) to LinkedIn.
-
-        Args:
-            text: The text content to post
-            media_path: Path to the media file
-            visibility: Post visibility - "connections" or "public"
-
-        Returns:
-            bool: True if post successful, False otherwise
         """
         if not self.is_logged_in:
             logger.error("Not logged in. Please login first.")
@@ -846,23 +831,9 @@ class LinkedInSeleniumPoster:
             if not textarea:
                 return False
 
-            # Enter text
-            textarea.clear()
-
-            # Handle Unicode characters that might cause ChromeDriver issues
-            try:
-                # Try direct send_keys first
-                textarea.send_keys(text)
-            except Exception as e:
-                if "BMP" in str(e):
-                    # If BMP error, try to clean the text
-                    logger.warning("Unicode characters detected, cleaning text...")
-                    # Remove non-BMP characters (emojis, etc.)
-                    cleaned_text = "".join(char for char in text if ord(char) < 65536)
-                    textarea.send_keys(cleaned_text)
-                    logger.info(f"Posted cleaned text: {cleaned_text}")
-                else:
-                    raise e
+            # Always use JS workaround for emoji support
+            self.set_textarea_value_js(textarea, text)
+            logger.info("Posted text using JS workaround")
 
             # Upload media
             if not self.upload_media(media_path):
@@ -997,19 +968,11 @@ class LinkedInSeleniumPoster:
             # and then click the Schedule button
             textarea = self.find_post_textarea()
             if textarea:
-                textarea.clear()
-                try:
-                    textarea.send_keys(text)
-                except Exception as e:
-                    if "BMP" in str(e):
-                        cleaned_text = "".join(
-                            char for char in text if ord(char) < 65536
-                        )
-                        textarea.send_keys(cleaned_text)
-                        logger.info(f"Re-entered cleaned text: {cleaned_text}")
-                    else:
-                        raise e
-                logger.info("Re-entered post content in scheduling dialog")
+                # Always use JS workaround for emoji support
+                self.set_textarea_value_js(textarea, text)
+                logger.info(
+                    "Re-entered post content in scheduling dialog using JS workaround"
+                )
             else:
                 logger.warning("Could not find textarea to re-enter content")
 
@@ -1299,19 +1262,13 @@ def main():
             print("✅ Successfully logged in to LinkedIn")
             print("💾 Browser cache and cookies are being saved for future sessions")
 
-            # Example 1: Post immediately
-            immediate_text = f"This is an immediate post from the LinkedIn wrapper 😁😁 😁 ! Posted at {datetime.datetime.now().strftime('%Y-%m-%d %H:%M')} #LinkedInAutomation #WrapperDemo"
-
-            print("\n📝 Example 1: Posting immediately")
-            print(f"Text: '{immediate_text}'")
-
             # Example 2: Schedule a post for tomorrow
             tomorrow = datetime.datetime.now() + datetime.timedelta(days=1)
             tomorrow = tomorrow.replace(
                 hour=10, minute=0, second=0, microsecond=0
             )  # 10:00 AM tomorrow
 
-            scheduled_text = f"This is a scheduled post from the LinkedIn wrapper! Scheduled for {tomorrow.strftime('%Y-%m-%d %H:%M')} #LinkedInAutomation #ScheduledPost"
+            scheduled_text = f"This is a scheduled post from the LinkedIn wrapper 😁😁 😁 ! Scheduled for {tomorrow.strftime('%Y-%m-%d %H:%M')} #LinkedInAutomation #ScheduledPost"
 
             print("\n📅 Example 2: Scheduling post")
             print(f"Text: '{scheduled_text}'")

@@ -14,15 +14,18 @@ Requirements:
 import datetime
 import logging
 import os
+import platform
 import threading
 import time
 
+import pyperclip
 from dotenv import load_dotenv
 from selenium import webdriver
 from selenium.common.exceptions import NoSuchElementException, TimeoutException
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.common.by import By
+from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import WebDriverWait
 from webdriver_manager.chrome import ChromeDriverManager
@@ -516,6 +519,19 @@ class TwitterSeleniumPoster:
             logger.error(f"Could not click confirm button: {e}")
             return False
 
+    def set_tweet_box_value_clipboard(self, tweet_box, text):
+        if self.driver is None:
+            logger.error("Driver not initialized")
+            return
+        pyperclip.copy(text)
+        tweet_box.click()
+        time.sleep(0.5)
+        if platform.system() == "Darwin":
+            tweet_box.send_keys(Keys.COMMAND, "v")
+        else:
+            tweet_box.send_keys(Keys.CONTROL, "v")
+        time.sleep(0.5)
+
     def post_text(self, text: str) -> bool:
         if not self.is_logged_in:
             logger.error("Not logged in. Please login first.")
@@ -528,8 +544,9 @@ class TwitterSeleniumPoster:
                 return False
             tweet_box.click()
             time.sleep(1)
-            tweet_box.send_keys(text)
-            print(f"📝 Typed text: '{text}'")
+            # Use clipboard paste workaround for emoji support
+            self.set_tweet_box_value_clipboard(tweet_box, text)
+            print(f"📝 Typed text (clipboard paste): '{text}'")
 
             # Find the post button
             tweet_btn = WebDriverWait(self.driver, self.wait_timeout).until(
@@ -586,11 +603,18 @@ class TwitterSeleniumPoster:
                 return False
             tweet_box.click()
             time.sleep(1)
-            tweet_box.send_keys(text)
-            print(f"📝 Typed scheduled text: '{text}'")
-
+            # Do NOT enter text yet!
             if self.find_schedule_button():
                 if self.set_schedule_datetime(schedule_time):
+                    # After modal closes, re-find the tweet box and enter text
+                    tweet_box = self.find_tweet_box()
+                    if not tweet_box:
+                        logger.error("Could not find tweet box after scheduling modal")
+                        return False
+                    tweet_box.click()
+                    time.sleep(1)
+                    self.set_tweet_box_value_clipboard(tweet_box, text)
+                    print(f"📝 Typed scheduled text (clipboard paste): '{text}'")
                     try:
                         # Wait for and click the final schedule button
                         schedule_btn = WebDriverWait(
@@ -606,8 +630,6 @@ class TwitterSeleniumPoster:
                         print(f"🔍 Found schedule button: {schedule_btn.text}")
                         print(f"🔍 Button enabled: {schedule_btn.is_enabled()}")
                         print(f"🔍 Button displayed: {schedule_btn.is_displayed()}")
-
-                        # Try JavaScript click if regular click doesn't work
                         try:
                             schedule_btn.click()
                             print("✅ Regular schedule click worked")
@@ -618,10 +640,7 @@ class TwitterSeleniumPoster:
                                 "arguments[0].click();", schedule_btn
                             )
                             print("✅ JavaScript schedule click worked")
-
-                        # Wait 5 seconds after clicking schedule to ensure the tweet is scheduled
                         time.sleep(5)
-                        # Wait for the tweet box to become empty and enabled, and for the button to become disabled
                         WebDriverWait(self.driver, self.wait_timeout * 2).until(
                             lambda d: d.find_element(
                                 By.CSS_SELECTOR,
@@ -660,20 +679,25 @@ class TwitterSeleniumPoster:
         if tweet_box:
             tweet_box.click()
             time.sleep(1)
-            tweet_box.send_keys(text)
-            print(f"📝 Typed scheduled text: '{text}'")
-
+            # Do NOT enter text yet!
             if self.find_schedule_button():
                 print("✅ Found schedule button, setting datetime...")
                 if self.set_schedule_datetime(schedule_time):
                     print(
                         "✅ Datetime set successfully, looking for final schedule button..."
                     )
+                    # After modal closes, re-find the tweet box and enter text
+                    tweet_box = self.find_tweet_box()
+                    if not tweet_box:
+                        logger.error("Could not find tweet box after scheduling modal")
+                        return False
+                    tweet_box.click()
+                    time.sleep(1)
+                    self.set_tweet_box_value_clipboard(tweet_box, text)
+                    print(f"📝 Typed scheduled text (clipboard paste): '{text}'")
                     try:
                         # Wait a moment for the UI to update after datetime selection
                         time.sleep(2)
-
-                        # Look for the schedule button (which was previously the post button)
                         schedule_btn = WebDriverWait(
                             self.driver, self.wait_timeout
                         ).until(
@@ -690,8 +714,6 @@ class TwitterSeleniumPoster:
                         print(
                             f"🔍 Button aria-label: {schedule_btn.get_attribute('aria-label')}"
                         )
-
-                        # Try JavaScript click if regular click doesn't work
                         try:
                             schedule_btn.click()
                             print("✅ Regular final schedule click worked")
@@ -702,10 +724,7 @@ class TwitterSeleniumPoster:
                                 "arguments[0].click();", schedule_btn
                             )
                             print("✅ JavaScript final schedule click worked")
-
-                        # Wait 5 seconds after clicking schedule to ensure the tweet is scheduled
                         time.sleep(5)
-                        # Wait for the tweet box to become empty and enabled, and for the button to become disabled
                         try:
                             WebDriverWait(self.driver, self.wait_timeout * 2).until(
                                 lambda d: d.find_element(
@@ -728,12 +747,10 @@ class TwitterSeleniumPoster:
                             return True
                         except Exception as e:
                             print(f"⚠️ Could not confirm tweet box cleared: {e}")
-                            # Still return True if we got this far, as the scheduling might have worked
                             logger.info(
                                 "Scheduling completed, but could not confirm UI state"
                             )
                             return True
-
                     except Exception as e:
                         logger.error(f"Could not click final schedule button: {e}")
                         return False
