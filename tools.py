@@ -194,6 +194,7 @@ def write_twitter_post(
             past_posts=twitter_posts_supabase,
             description=description,
         )
+        + "The post should have a maximum of 280 characters"
     )
     post.status = "pending"  # type: ignore
 
@@ -968,4 +969,4 @@ def delete_post(
 
 
 if __name__ == "__main__":
-    post_to_twitter(twitter_post_id=38)
+    app.run()
