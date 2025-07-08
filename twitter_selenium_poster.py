@@ -804,15 +804,11 @@ def post_tweet(text: str, schedule_time: datetime.datetime | None = None):
 
 def main():
     """Demonstrate usage of post_tweet function."""
-    # Example: Post immediately
-    post_tweet(
-        f"This is an immediate tweet from the unified function! Posted at {datetime.datetime.now().strftime('%Y-%m-%d %H:%M')} #TwitterAutomation #UnifiedDemo"
-    )
     # Example: Schedule a tweet for tomorrow
     tomorrow = datetime.datetime.now() + datetime.timedelta(days=1)
     tomorrow = tomorrow.replace(hour=10, minute=0, second=0, microsecond=0)
     post_tweet(
-        f"This is a scheduled tweet from the unified function! Scheduled for {tomorrow.strftime('%Y-%m-%d %H:%M')} #TwitterAutomation #UnifiedDemo",
+        f"This is a scheduled tweet from the unified function 😁😁 😁 ! Scheduled for {tomorrow.strftime('%Y-%m-%d %H:%M')} #TwitterAutomation #UnifiedDemo",
         schedule_time=tomorrow,
     )
 

@@ -1300,7 +1300,7 @@ def main():
             print("💾 Browser cache and cookies are being saved for future sessions")
 
             # Example 1: Post immediately
-            immediate_text = f"This is an immediate post from the LinkedIn wrapper! Posted at {datetime.datetime.now().strftime('%Y-%m-%d %H:%M')} #LinkedInAutomation #WrapperDemo"
+            immediate_text = f"This is an immediate post from the LinkedIn wrapper 😁😁 😁 ! Posted at {datetime.datetime.now().strftime('%Y-%m-%d %H:%M')} #LinkedInAutomation #WrapperDemo"
 
             print("\n📝 Example 1: Posting immediately")
             print(f"Text: '{immediate_text}'")

@@ -40,7 +40,40 @@ def write_linkedin_post(
     post_date_str: str,
     description: str,
 ) -> str:
-    """Write a LinkedIn post about a given topic"""
+    """
+    Write a LinkedIn post about a given topic and store it in the database.
+
+    This function generates a LinkedIn post using AI based on the provided parameters,
+    stores it in the Supabase database with a 'pending' status, and returns a confirmation
+    message with the post ID.
+
+    Args:
+        topic (str): The main topic or subject of the LinkedIn post
+        target_audience (str): The intended audience for the post (e.g., "builders who don't want to code")
+        platform (str): The social media platform (should be "linkedin")
+        content_type (str): Type of content being created (e.g., "linkedin post")
+        goal (str): The objective of the post (e.g., "get clicks on the post")
+        post_date_str (str): Scheduled posting date in ISO format (YYYY-MM-DDTHH:MM:SS)
+        description (str): Additional description or context for the post content
+
+    Returns:
+        str: Confirmation message with post title and database ID
+
+    Raises:
+        ValueError: If the post_date_str is not in valid ISO format
+
+    Example:
+        >>> write_linkedin_post(
+        ...     topic="AI Automation",
+        ...     target_audience="developers",
+        ...     platform="linkedin",
+        ...     content_type="linkedin post",
+        ...     goal="generate leads",
+        ...     post_date_str="2024-01-15T10:00:00",
+        ...     description="How AI can automate repetitive tasks"
+        ... )
+        "LinkedIn post written: AI Automation Guide with id : 123"
+    """
 
     try:
         post_date = datetime.datetime.fromisoformat(post_date_str)
@@ -101,7 +134,41 @@ def write_twitter_post(
     post_date_str: str,
     description: str,
 ) -> str:
-    """Write a Twitter post about a given topic"""
+    """
+    Write a Twitter post about a given topic and store it in the database.
+
+    This function generates a Twitter post using AI based on the provided parameters,
+    stores it in the Supabase database with a 'pending' status, and returns a confirmation
+    message with the post ID. The function considers past Twitter posts to maintain
+    content consistency and avoid repetition.
+
+    Args:
+        topic (str): The main topic or subject of the Twitter post
+        target_audience (str): The intended audience for the post (e.g., "builders who don't want to code")
+        platform (str): The social media platform (should be "twitter")
+        content_type (str): Type of content being created (e.g., "twitter post")
+        goal (str): The objective of the post (e.g., "get clicks on the post")
+        post_date_str (str): Scheduled posting date in ISO format (YYYY-MM-DDTHH:MM:SS)
+        description (str): Additional description or context for the post content
+
+    Returns:
+        str: Confirmation message with post content preview and database ID
+
+    Raises:
+        ValueError: If the post_date_str is not in valid ISO format
+
+    Example:
+        >>> write_twitter_post(
+        ...     topic="No-Code Tools",
+        ...     target_audience="entrepreneurs",
+        ...     platform="twitter",
+        ...     content_type="twitter post",
+        ...     goal="drive engagement",
+        ...     post_date_str="2024-01-15T14:30:00",
+        ...     description="Top no-code platforms for 2024"
+        ... )
+        "Twitter post written: Discover the best no-code tools... with id : 456"
+    """
 
     try:
         post_date = datetime.datetime.fromisoformat(post_date_str)
@@ -154,7 +221,38 @@ def write_youtube_description(
     goal: str,
     post_date_str: str,
 ) -> str:
-    """Write a YouTube video description about a given topic"""
+    """
+    Write a YouTube video description about a given topic and store it in the database.
+
+    This function generates a YouTube video description using AI based on the provided parameters,
+    including a title and detailed description. It stores the metadata in the Supabase database
+    with a 'pending' status and returns a confirmation message with the description ID.
+
+    Args:
+        topic (str): The main topic or subject of the YouTube video
+        target_audience (str): The intended audience for the video (e.g., "builders who don't want to code")
+        video_summary (str): A summary of the video content to help generate relevant description
+        content_type (str): Type of content being created (e.g., "youtube description")
+        goal (str): The objective of the video (e.g., "Get the most views on youtube")
+        post_date_str (str): Scheduled publishing date in ISO format (YYYY-MM-DDTHH:MM:SS)
+
+    Returns:
+        str: Confirmation message with video title and database ID
+
+    Raises:
+        ValueError: If the post_date_str is not in valid ISO format
+
+    Example:
+        >>> write_youtube_description(
+        ...     topic="Building SaaS with No-Code",
+        ...     target_audience="startup founders",
+        ...     video_summary="Complete tutorial on building a SaaS product using Bubble",
+        ...     content_type="youtube description",
+        ...     goal="maximize views and subscriptions",
+        ...     post_date_str="2024-01-15T18:00:00"
+        ... )
+        "YouTube description written: How to Build a SaaS with No-Code with id : 789"
+    """
 
     try:
         post_date = datetime.datetime.fromisoformat(post_date_str)
@@ -210,7 +308,39 @@ def post_to_linkedin(
     linkedin_post_id: int,
     visibility: str = "connections",
 ) -> str:
-    """Post content to LinkedIn using Selenium automation. Can schedule posts for later."""
+    """
+    Post content to LinkedIn using Selenium automation with optional scheduling.
+
+    This function retrieves a LinkedIn post from the database by ID, logs into LinkedIn
+    using Selenium automation, and either posts immediately or schedules the post for
+    a later time. The post status is updated to 'posted' upon successful completion.
+
+    Args:
+        linkedin_post_id (int): The database ID of the LinkedIn post to publish
+        visibility (str, optional): Post visibility setting. Defaults to "connections".
+                                  Options: "connections", "public", "group"
+
+    Returns:
+        str: Status message indicating success or failure of the posting operation
+
+    Raises:
+        Exception: If there are issues with LinkedIn login, posting, or database operations
+
+    Environment Variables:
+        LINKEDIN_EMAIL: LinkedIn account email address
+        LINKEDIN_PASSWORD: LinkedIn account password
+
+    Example:
+        >>> post_to_linkedin(linkedin_post_id=123, visibility="public")
+        "LinkedIn post result: Successfully posted to LinkedIn with public visibility"
+
+    Note:
+        - Requires valid LinkedIn credentials in environment variables
+        - Uses Selenium with headless=False for debugging purposes
+        - Automatically updates post status in database upon successful posting
+    """
+
+    print(linkedin_post_id, visibility)
 
     linkedin_post_supabase = (
         supabase.table("linkedin_posts")
@@ -250,7 +380,7 @@ def post_to_linkedin(
 
                 # Use the new wrapper function to post content
                 success = poster.post_linkedin_content(
-                    text=linkedin_post.post,
+                    text=linkedin_post.post or "",
                     schedule_time=schedule_datetime,
                     visibility=visibility,
                 )
@@ -287,7 +417,37 @@ def upload_to_youtube(
     channel: Literal["albertthebuilder", "davia"],
     privacy_status: str = "private",
 ) -> str:
-    """Upload a video to YouTube with the given metadata, channel is the channel to upload to it must have been specified by the user before"""
+    """
+    Upload a video to YouTube with metadata from the database.
+
+    This function retrieves video metadata (title, description, file path) from the database
+    using the provided video_id, then uploads the video to the specified YouTube channel
+    with the given privacy settings. The video status is updated to 'posted' upon successful upload.
+
+    Args:
+        video_id (int): The database ID of the video to upload
+        channel (Literal["albertthebuilder", "davia"]): The YouTube channel to upload to.
+                                                       Must be one of the specified channels.
+        privacy_status (str, optional): Video privacy setting. Defaults to "private".
+                                       Options: "private", "unlisted", "public"
+
+    Returns:
+        str: Status message indicating success or failure of the upload operation
+
+    Raises:
+        FileNotFoundError: If the video file specified in the database cannot be found
+        Exception: If there are issues with YouTube upload or database operations
+
+    Example:
+        >>> upload_to_youtube(video_id=456, channel="davia", privacy_status="private")
+        "Successfully uploaded video id: 456"
+
+    Note:
+        - Video file path must be accessible from the system
+        - Automatically adds default tags: ["davia", "ai", "development", "automation"]
+        - Updates video status in database upon successful upload
+        - Supports scheduled publishing if post_date is set in the database
+    """
 
     description_supabase = (
         supabase.table("youtube_videos").select("*").eq("id", video_id).execute()
@@ -313,9 +473,9 @@ def upload_to_youtube(
 
         # Upload the video
         upload_local_video(
-            video_path=youtube_description.video_url_drive,
-            title=youtube_description.title,
-            description=youtube_description.description,
+            video_path=youtube_description.video_url_drive or "",
+            title=youtube_description.title or "",
+            description=youtube_description.description or "",
             channel=channel,
             publish_at=publish_datetime,
             privacy_status="private",
@@ -340,7 +500,32 @@ def upload_to_youtube(
 def post_to_twitter(
     twitter_post_id: int,
 ) -> str:
-    """Post content to Twitter using Selenium automation. Can schedule posts for later."""
+    """
+    Post content to Twitter using Selenium automation with optional scheduling.
+
+    This function retrieves a Twitter post from the database by ID and publishes it
+    to Twitter either immediately or at a scheduled time. The post status is updated
+    to 'posted' upon successful completion.
+
+    Args:
+        twitter_post_id (int): The database ID of the Twitter post to publish
+
+    Returns:
+        str: Status message indicating success or failure of the posting operation
+
+    Raises:
+        Exception: If there are issues with Twitter posting or database operations
+
+    Example:
+        >>> post_to_twitter(twitter_post_id=789)
+        "Twitter post result: Successfully posted to Twitter"
+
+    Note:
+        - Uses the post_tweet function from twitter_selenium_poster module
+        - Supports scheduled posting if post_date is set in the database
+        - Automatically updates post status in database upon successful posting
+        - Handles timezone conversion for scheduled posts
+    """
 
     twitter_post_supabase = (
         supabase.table("twitter_posts").select("*").eq("id", twitter_post_id).execute()
@@ -363,7 +548,7 @@ def post_to_twitter(
                 return "Invalid date format for schedule_time"
 
         # Use the post_tweet function to post content
-        post_tweet(twitter_post.post, schedule_datetime)
+        post_tweet(twitter_post.post or "", schedule_datetime)
 
         if schedule_datetime:
             result = f"Successfully scheduled Twitter post for {schedule_datetime.strftime('%Y-%m-%d %H:%M')}"
@@ -382,6 +567,47 @@ def post_to_twitter(
 
 
 def visualise_week_ahead():
+    """
+    Display a comprehensive weekly content schedule for the next 7 days.
+
+    This function retrieves all scheduled posts (LinkedIn, Twitter, YouTube) for the
+    upcoming week and presents them in a formatted, easy-to-read schedule. It shows
+    content organized by day of the week with status indicators and summary statistics.
+
+    The visualization includes:
+    - Daily breakdown with weekday names and dates
+    - LinkedIn posts with titles and status
+    - Twitter posts with status indicators
+    - YouTube videos with titles and status
+    - Summary statistics for the week
+
+    Returns:
+        None: Prints the schedule directly to console
+
+    Example Output:
+        ================================================================================
+        📅 WEEK AHEAD CONTENT SCHEDULE
+        ================================================================================
+
+        📆 Monday (2024-01-15)
+        --------------------------------------------------
+        🔗 LinkedIn: ✅ AI Automation Guide
+        🐦 Twitter: ⏳ No-Code Tools Thread
+        📺 YouTube: ⏳ Building SaaS Tutorial
+
+        📊 SUMMARY:
+           LinkedIn posts: 3
+           Twitter posts: 3
+           YouTube videos: 2
+        ================================================================================
+
+    Note:
+        - Shows content for exactly 7 days starting from today
+        - Status indicators: ✅ for posted, ⏳ for pending
+        - Handles cases where no content is scheduled for a particular day
+        - Uses emojis and formatting for better readability
+    """
+
     # get all posts from supabase for the next 8 days
 
     # Calculate date range for next 8 days
@@ -495,7 +721,31 @@ def visualise_week_ahead():
 def get_all_posts_for_next_week() -> tuple[
     list[LinkedinPost], list[TwitterPost], list[YouTubeDescription]
 ]:
-    """Get all the posts for the next week and return them as a tuple"""
+    """
+    Retrieve all scheduled posts for the next 7 days from the database.
+
+    This function queries the database for all LinkedIn posts, Twitter posts, and
+    YouTube descriptions that are scheduled to be published within the next week
+    (7 days from today). Returns the data as structured objects for programmatic use.
+
+    Returns:
+        tuple[list[LinkedinPost], list[TwitterPost], list[YouTubeDescription]]:
+            A tuple containing three lists:
+            - List of LinkedinPost objects for the next week
+            - List of TwitterPost objects for the next week
+            - List of YouTubeDescription objects for the next week
+
+    Example:
+        >>> linkedin_posts, twitter_posts, youtube_posts = get_all_posts_for_next_week()
+        >>> print(f"Found {len(linkedin_posts)} LinkedIn posts for next week")
+        "Found 3 LinkedIn posts for next week"
+
+    Note:
+        - Date range: from today (inclusive) to 7 days from today (exclusive)
+        - Returns empty lists if no content is scheduled for the period
+        - All returned objects are properly typed with their respective classes
+        - Useful for programmatic content management and analysis
+    """
     today = datetime.datetime.now().date()
     end_date = today + datetime.timedelta(days=7)
 
@@ -533,7 +783,32 @@ def get_all_posts_for_next_week() -> tuple[
 
 @app.task
 def get_all_posts():
-    """Get all the posts"""
+    """
+    Retrieve all posts from the database regardless of date.
+
+    This function queries the database for all LinkedIn posts, Twitter posts, and
+    YouTube descriptions that exist in the system, regardless of their scheduled
+    date or current status. Returns the data as structured objects for analysis
+    or management purposes.
+
+    Returns:
+        tuple[list[LinkedinPost], list[TwitterPost], list[YouTubeDescription]]:
+            A tuple containing three lists:
+            - List of all LinkedinPost objects in the database
+            - List of all TwitterPost objects in the database
+            - List of all YouTubeDescription objects in the database
+
+    Example:
+        >>> linkedin_posts, twitter_posts, youtube_posts = get_all_posts()
+        >>> print(f"Total posts in system: {len(linkedin_posts) + len(twitter_posts) + len(youtube_posts)}")
+        "Total posts in system: 45"
+
+    Note:
+        - Returns ALL posts in the database, not just recent or scheduled ones
+        - Useful for content analysis, reporting, or bulk operations
+        - All returned objects are properly typed with their respective classes
+        - Can be resource-intensive for large datasets
+    """
     linkedin_posts_supabase = (
         supabase.table("linkedin_posts").select("*").execute().data
     )
@@ -551,7 +826,44 @@ def get_all_posts():
 
 @app.task
 def schedule_for_next_week(user_prompt: str):
-    """Schedule the content for the next week"""
+    """
+    Automatically generate and schedule content for the next week based on user input.
+
+    This function uses AI to generate a content schedule for the upcoming week based on
+    the user's prompt. It creates content for Monday, Wednesday, and Friday across all
+    platforms (LinkedIn, Twitter, YouTube) and schedules them automatically. The AI
+    generates topics, descriptions, and video summaries that align with the user's goals.
+
+    Args:
+        user_prompt (str): A description of the content theme, goals, or topics for the week.
+                          This guides the AI in generating relevant content across all platforms.
+
+    Returns:
+        str: Confirmation message indicating successful scheduling
+
+    Example:
+        >>> schedule_for_next_week("Focus on no-code tools and automation for entrepreneurs")
+        "Content scheduled for the next week"
+
+    Generated Content:
+        For each day (Monday, Wednesday, Friday), the function creates:
+        - LinkedIn post with topic and description
+        - Twitter post with the same topic and description
+        - YouTube description with topic and video summary
+
+    Target Audience:
+        All content is automatically targeted to "builders who don't want to code"
+
+    Goals:
+        - LinkedIn/Twitter: "get clicks on the post"
+        - YouTube: "Get the most views on youtube"
+
+    Note:
+        - Uses AI model to generate coherent content themes across the week
+        - Automatically calculates the next Monday, Wednesday, and Friday dates
+        - Creates content for all three platforms simultaneously
+        - All posts are stored with 'pending' status for later review/posting
+    """
     response = model.with_structured_output(Schedule).invoke(
         schedule_prompt.format(user_prompt=user_prompt)
     )
@@ -621,11 +933,39 @@ def delete_post(
     post_id: int,
     table: Literal["linkedin_posts", "twitter_posts", "youtube_descriptions"],
 ) -> str:
-    """Delete a post from the database"""
+    """
+    Delete a post from the specified database table.
+
+    This function permanently removes a post from the database based on its ID and
+    the specified table. This is useful for removing unwanted or outdated content
+    before it gets published.
+
+    Args:
+        post_id (int): The database ID of the post to delete
+        table (Literal["linkedin_posts", "twitter_posts", "youtube_descriptions"]):
+            The database table containing the post to delete. Must be one of the
+            specified table names.
+
+    Returns:
+        str: Confirmation message indicating successful deletion
+
+    Raises:
+        Exception: If the post doesn't exist or database operation fails
+
+    Example:
+        >>> delete_post(post_id=123, table="linkedin_posts")
+        "Post deleted"
+
+    Note:
+        - This operation is irreversible - deleted posts cannot be recovered
+        - Works for posts in any status (pending, posted, etc.)
+        - No validation is performed on post_id existence before deletion
+        - Use with caution, especially for posts that have already been published
+    """
     supabase.table(table).delete().eq("id", post_id).execute()
 
     return "Post deleted"
 
 
 if __name__ == "__main__":
-    app.run()
+    post_to_twitter(twitter_post_id=38)

@@ -6,24 +6,27 @@ from pydantic import BaseModel
 
 
 class LinkedinPost(BaseModel):
-    title: str
-    post: str
+    title: str | None = None
+    post: str | None = None
     status: Literal["pending", "posted"] = "pending"
     post_date: str | None = None
+    id: int | None = None
 
 
 class TwitterPost(BaseModel):
-    post: str
+    post: str | None = None
     status: Literal["pending", "posted"] = "pending"
     post_date: str | None = None
+    id: int | None = None
 
 
 class YouTubeDescription(BaseModel):
-    title: str
-    description: str
-    video_url_drive: str
+    title: str | None = None
+    description: str | None = None
+    video_url_drive: str | None = None
     status: Literal["pending", "posted"] = "pending"
     post_date: str | None = None
+    id: int | None = None
 
 
 class Schedule(BaseModel):
